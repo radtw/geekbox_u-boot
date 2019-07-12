@@ -1,0 +1,215 @@
+
+
+check under what circumstance would "common/cmd_sata.c" being compiled.
+
+/home/julian/geekbox/mmallow/u-boot/common/cmd_sata.c:35: undefined reference to `sata_read'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_sata.c:35: undefined reference to `sata_read'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_sata.c:36: undefined reference to `sata_write'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_sata.c:36: undefined reference to `sata_write'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_sata.c:38: undefined reference to `init_sata'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_sata.c:40: undefined reference to `scan_sata'
+common/built-in.o: In function `do_sata':
+/home/julian/geekbox/mmallow/u-boot/common/cmd_sata.c:153: undefined reference to `sata_read'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_sata.c:171: undefined reference to `sata_write'
+
+=============================================================
+
+init_sata driver appears in
+
+drivers/block/sata_dwc.c:int init_sata(int dev)
+drivers/block/sata_sil.c:int init_sata(int dev)
+drivers/block/sata_sil3114.c:int init_sata (int dev)
+drivers/block/pata_bfin.c:int init_sata(int dev)
+drivers/block/ata_piix.c:int init_sata(int dev)
+drivers/block/dwc_ahsata.c:int init_sata(int dev)
+drivers/block/ata_piix.h:int init_sata(int dev);
+
+
+experiment
+#define CONFIG_SYS_SATA_MAX_DEVICE	1
+drivers/block/sata_dwc.c:295:14: error: 'SATA_BASE_ADDR' undeclared (first use in this function)
+  base = (u8*)SATA_BASE_ADDR;
+
+don't know about the register address....
+
+
+
+===============================================================
+
+But looks like in Linux kernel, SATA HD is called "SCSI"
+
+common/built-in.o: In function `initr_scsi':
+/home/julian/geekbox/mmallow/u-boot/common/board_r.c:571: undefined reference to `scsi_init'
+common/built-in.o: In function `do_scsiboot':
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:236: undefined reference to `common_diskboot'
+common/built-in.o: In function `scsi_write':
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:450: undefined reference to `scsi_exec'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:451: undefined reference to `scsi_print_error'
+common/built-in.o: In function `scsi_read':
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:396: undefined reference to `scsi_exec'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:397: undefined reference to `scsi_print_error'
+common/built-in.o: In function `scsi_scan':
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:112: undefined reference to `scsi_exec'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:117: undefined reference to `scsi_print_error'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:139: undefined reference to `scsi_exec'
+common/built-in.o: In function `scsi_read_capacity':
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:513: undefined reference to `scsi_exec'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:539: undefined reference to `scsi_exec'
+common/built-in.o: In function `do_scsi':
+/home/julian/geekbox/mmallow/u-boot/common/cmd_scsi.c:252: undefined reference to `scsi_bus_reset'
+
+
+============================
+
+SCSI depends on PCI
+
+copy u-boot/drivers/pci/Kconfig
+
+
+===============================
+USB
+
+undefined reference to `usb_lowlevel_stop'
+
+CONFIG_USB_DWC_HCD
+
+===================================
+CONFIG_CMD_USB_MASS_STORAGE
+
+it seems to mean u-boot make geekbox become a USB mass storage device and PC can r/w to geekbox
+
+=========================================
+
+/home/julian/geekbox/mmallow/u-boot/common/cmd_usb_mass_storage.c:100: undefined reference to `fsg_init'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_usb_mass_storage.c:106: undefined reference to `g_dnl_register'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_usb_mass_storage.c:115: undefined reference to `g_dnl_board_usb_cable_connected'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_usb_mass_storage.c:122: undefined reference to `g_dnl_board_usb_cable_connected'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_usb_mass_storage.c:141: undefined reference to `usb_gadget_handle_interrupts'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_usb_mass_storage.c:143: undefined reference to `fsg_main_thread'
+/home/julian/geekbox/mmallow/u-boot/common/cmd_usb_mass_storage.c:157: undefined reference to `g_dnl_unregister'
+
+disable CONFIG_CMD_USB_MASS_STORAGE, since I don't want to use geekbox as mass storage
+=================================
+Boot from geekbox landingship SATA hard driver,
+
+in UMSBoot.c, UMSInit() will check the 4bytes at UMS_BOOT_PART_OFFSET
+if it matches 0xFCDC8C3B, then it's either update or boot from UMS
+
+if gIdDataBuf[128+104/4] == 0
+it's update from UMS (USB mass strage)
+
+if gIdDataBuf[128+104/4] == 1
+it's boot from UMS
+
+either way, UMSInit() should return 1
+
+UMSInit() is called by StorageInit() board/rockchip/common/storage/storage.c
+
+The booting priority order defined in storage.c is
+UMS
+SD card
+EMMC
+NAND
+
+========================================
+TSAI UMSInit(fn=0000000005913c30,lr=0000000005915aec) ChipSel:0 @board/rockchip/common/mediaboot/UMSBoot.c                          
+TSAI rk_usb_host_lookup board/rockchip/common/mediaboot/UMSBoot.c                                                                   
+1 USB controller selected, name ehci-host                                                                                           
+Boot from usb device ehci-host @ 00000000ff500000                                                                                   
+TSAI usb_init @common/usb.c                                                                                                         
+TSAI: usb_hub_reset @common/usb_hub.c                                                                                               
+USB0:   TSAI: usb_lowlevel_init idx 0 type 0 @drivers/usb/host/ehci-hcd.c                                                           
+TSAI: ehci_hcd_init idx 0 type 0 rkusb_active_hcd 000000000595fe68 reg 00000000ff500000 drivers/usb/host/ehci-rk.c                  
+ehci_hcd_init index 0,complete                                                                                                      
+TSAI ehci_reset idx 0 @drivers/usb/host/ehci-hcd.c                                                                                  
+USB EHCI 1.00                                                                                                                       
+scanning bus 0 for devices... 4 USB Device(s) found                                                                                 
+       scanning usb for storage devices... 1 Storage Device(s) found                                                                
+TSAI: data on USB storage at UMS_BOOT_PART_OFFSET, first 4 byte is 00000000 @board/rockchip/common/mediaboot/UMSBoot.c 316          
+Deinit USB Host
+
+The found the FUJITSU device is 
+USB device 0: Vendor: FUJITSU  Rev: 0000 Prod: MJA2250BH G2            Type: Hard Disk            Capacity: 238475.1 MB = 232.8 GB (488397168 x 512)
+
+============================================
+
+u-boot geekbox default env
+
+baudrate=115200                                                                                                                     
+bootcmd=bootrk                                                                                                                      
+bootdelay=1                                                                                                                         
+fastboot_unlocked=0                                                                                                                 
+initrd_high=0xffffffffffffffff=n                                                                                                    
+verify=n                                                                                                                            
+                                                                                                                                    
+Environment size: 118/508 bytes
+
+============================================
+When bootrk (default boot)
+
+so there should be a partition named "boot"
+
+TSAI do_bootrk @common/cmd_bootrk.c                                                                                                 
+bootrk                                                                                                                              
+TSAI: rk_load_image_from_storage boot lba=131072, blocks=32768                                                                      
+load fdt from resouce.                                                                                                              
+ERROR: [get_entry_ram]: Cannot find logo_kernel.bmp!                                                                                
+Secure Boot state: 0                                                                                                                
+kernel   @ 0x00280000 (0x00e8c350)                                                                                                  
+ramdisk  @ 0x05bf0000 (0x00146750)                                                                                                  
+bootrk: do_bootm_linux...                                                                                                           
+   Loading Device Tree to 0000000005600000, end 000000000561a32a ... OK                                                             
+Add bank:0000000000200000, 000000007fe00000                                                                                         
+                                                                                                                                    
+Starting kernel ...                                                                                                                 
+
+
+=================================================
+When boot from UMS,
+
+UMS_BOOT_PART_OFFSET=64
+
+#define UMS_BOOT_PART_SIZE	1024
+#define UMS_BOOT_PART_OFFSET	64
+#define UMS_FW_PART_OFFSET	8192
+#define UMS_SYS_PART_OFFSET	8064
+
+So suppose at LBA 64, there is 512K which is UMS boot
+this means at byte 32768. first 4 byte should be 0xFCDC8C3B
+
+and at offset 616 (0x268) byte of this sector, if the value is 1, then it means UMS boot
+
+==============
+the data at offset 8064 is for bootloader env data
+
+=================================================
+dump_disk_partitions:                                                                                                               
+partition(bootloaderdata): start=0x00000800, size=0x00001800, type=U-Boot                                                           
+partition(uboot): start=0x00002000, size=0x00004000, type=U-Boot                                                                    
+partition(trust): start=0x00006000, size=0x00004000, type=U-Boot                                                                    
+partition(misc): start=0x0000A000, size=0x00002000, type=U-Boot                                                                     
+partition(resource): start=0x0000C000, size=0x00008000, type=U-Boot                                                                 
+partition(kernel): start=0x00014000, size=0x00010000, type=U-Boot                                                                   
+partition(boot): start=0x00024000, size=0x00008000, type=U-Boot                                                                     
+partition(recovery): start=0x0002C000, size=0x00010000, type=U-Boot                                                                 
+partition(backup): start=0x0003C000, size=0x00038000, type=U-Boot                                                                   
+partition(cache): start=0x00074000, size=0x00040000, type=U-Boot                                                                    
+partition(kpanic): start=0x000B4000, size=0x00002000, type=U-Boot                                                                   
+partition(system): start=0x000B6000, size=0x00400000, type=U-Boot                                                                   
+partition(metadata): start=0x004B6000, size=0x00008000, type=U-Boot                                                                 
+partition(baseparameter): start=0x004BE000, size=0x00002000, type=U-Boot                                                            
+
+
+=========================================
+
+write to LBA directly, if partition LBA is already clear
+eg
+
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wl 1024 '/home/julian/geekbox/utils/rockdev/parameter'
+
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wl 0x14000 '/home/julian/geekbox/mmallow/kernel/kernel.img'
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wl 0xc000 '/home/julian/geekbox/mmallow/kernel/resource.img'
+
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wl 0x24000 '/home/julian/geekbox/mmallow/rockdev/Image-rk3368_box/boot.img'
+
+=============================================
