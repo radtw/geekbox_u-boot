@@ -362,6 +362,7 @@ void ParseParam(PBootInfo info, char *param, uint32 len)
 #if TSAI
 	static int g_gpt_part_count = 0;
 	static disk_partition_t* g_gpt_partition_array; /* the more recent partition being used by name */
+	static gpt_entry g_gpt_entry_array[128]; /* maximum 128 entries */
 #endif
 
 void dump_disk_partitions(void)
@@ -439,8 +440,13 @@ int load_disk_partitions(void)
 			gpt_header* p_gpt_hdr;
 			printf("TSAI UMS Loading GPT partition table dev_desc %p @%s\n",dev_desc ,__FILE__);
 			p_gpt_hdr = UMSGetGPTHeader();
-			if (p_gpt_hdr->signature == GPT_SIGNATURE) /* 'EFI PART'*/
+			if (p_gpt_hdr->signature == GPT_SIGNATURE) {/* 'EFI PART'*/
 				ret = 0;
+
+				printf("TSAI: Read Parameters from LBA 1024\n");
+				UMSReadLBA(0, UMS_GPT_PARAMETER_LBA, param->parameter, 128);
+			}
+
 			if (ret) { /* error */
 				goto end;
 			}
@@ -448,9 +454,12 @@ int load_disk_partitions(void)
 				g_gpt_part_count = p_gpt_hdr->num_partition_entries;
 				g_gpt_partition_array = calloc(g_gpt_part_count, sizeof(disk_partition_t));
 				printf("TSAI: read GPT partition tables N=%d @%s\n", g_gpt_part_count, __FILE__);
+				StorageReadLba(2, g_gpt_entry_array, 32);
 				for (i=0; i< g_gpt_part_count; i++) {
 					disk_partition_t* d = &g_gpt_partition_array[i];
-					ret = get_partition_info_efi(dev_desc, i+1, d);
+					gpt_entry* g = &g_gpt_entry_array[i];
+					//ret = get_partition_info_efi(dev_desc, i+1, d);
+					pte_to_disk_partition(dev_desc, g, d);
 					if (d->start==0 && d->size==0) /* entries are null-terminated */
 						break;
 				}
@@ -458,9 +467,8 @@ int load_disk_partitions(void)
 			dump_disk_partitions();
 
 			/* TSAI: for now I will just flash parameter text file to LBA 1024*/
-			StorageReadLba(UMS_GPT_PARAMETER_LBA, param->parameter, 128);
 			ParseParam(&gBootInfo, param->parameter, param->length);
-
+			printf("TSAI: From Parameter, cmd=%s @%s\n", gBootInfo.cmd_line, __FILE__);
 			goto end;
 		}
 	}

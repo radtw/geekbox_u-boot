@@ -30,9 +30,9 @@
 #define     FTL_NO_FLASH            -2
 #define     FTL_NO_IDB              -3
 
-#define     DATA_LEN            (1024*8*2/4)              //数据块单位word
-#define     SPARE_LEN           (32*8*2/4)               //校验数据长度
-#define     PAGE_LEN            (DATA_LEN+SPARE_LEN)    //每个数据单位的长度
+#define     DATA_LEN            (1024*8*2/4)              //锟斤拷锟捷块单位word
+#define     SPARE_LEN           (32*8*2/4)               //校锟斤拷锟斤拷锟捷筹拷锟斤拷
+#define     PAGE_LEN            (DATA_LEN+SPARE_LEN)    //每锟斤拷锟斤拷锟捷碉拷位锟侥筹拷锟斤拷
 
 #define EMMC_VENDOR_PART_START		(1024 * 7)
 #define NAND_VENDOR_PART_START		0
@@ -79,6 +79,9 @@ extern  uint32 StorageUbootSysDataLoad(uint32 Index, void *Buf);
 extern  int StorageReadFlashInfo( void *pbuf);
 extern  int StorageEraseBlock(uint32 blkIndex, uint32 nblk, uint8 mod);
 extern  uint16 StorageGetBootMedia(void);
+#if TSAI
+extern const char* StorageGetBootMediaName(void);
+#endif
 extern  uint32 StorageGetSDFwOffset(void);
 extern  uint32 StorageGetSDSysOffset(void);
 extern  int StorageReadId(void *pbuf);
@@ -114,7 +117,7 @@ typedef uint32 (*Memory_SysDataStore)(uint8 ChipSel, uint32 Index, void *Buf);
 typedef struct MEM_FUN_Tag
 {
 	uint16 id;
-	uint16 flag; // 传递给kernel的，确定从哪里引导到flash的
+	uint16 flag; // 锟斤拷锟捷革拷kernel锟侥ｏ拷确锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷flash锟斤拷
 	uint32 Valid;
 	Memory_Init Init;
 	Memory_ReadID ReadId;
@@ -134,15 +137,15 @@ typedef struct MEM_FUN_Tag
 } MEM_FUN_T, pMEM_FUN_T;
 
 
-typedef PACKED1  struct  _FLASH_INFO//需要加__packed或着声明时4对齐不然程序可能在有判断的时候出现异常
+typedef PACKED1  struct  _FLASH_INFO//锟斤拷要锟斤拷__packed锟斤拷锟斤拷锟斤拷锟斤拷时4锟斤拷锟诫不然锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷卸系锟绞憋拷锟斤拷锟斤拷锟届常
 {
-	uint32  FlashSize;          //（Sector为单位）   4Byte
-	uint16  BlockSize;          //（Sector为单位）   2Byte
-	uint8   PageSize;           // (Sector为单位）    1Byte
-	uint8   ECCBits;            //（bits为单位）    1Byte
+	uint32  FlashSize;          //锟斤拷Sector为锟斤拷位锟斤拷   4Byte
+	uint16  BlockSize;          //锟斤拷Sector为锟斤拷位锟斤拷   2Byte
+	uint8   PageSize;           // (Sector为锟斤拷位锟斤拷    1Byte
+	uint8   ECCBits;            //锟斤拷bits为锟斤拷位锟斤拷    1Byte
 	uint8   AccessTime;
 	uint8   ManufacturerName;   // 1Byte
-	uint8   FlashMask;          // 每一bit代表那个片选是否有FLASH
+	uint8   FlashMask;          // 每一bit锟斤拷锟斤拷锟角革拷片选锟角凤拷锟斤拷FLASH
 }PACKED2 FLASH_INFO, *pFLASH_INFO;
 
 
@@ -178,7 +181,7 @@ typedef struct LOADER_MEM_API_Tag
 	Memory_SysDataStore SysDataStore;  //vendor part,1MB
 } LOADER_MEM_API_T, *pLOADER_MEM_API_T;
 
-//1全局变量
+//1全锟街憋拷锟斤拷
 #undef	EXT
 #ifdef	IN_STORAGE
 #define	EXT

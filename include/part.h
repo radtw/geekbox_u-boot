@@ -182,6 +182,11 @@ int   test_part_amiga (block_dev_desc_t *dev_desc);
 #ifdef CONFIG_EFI_PARTITION
 #include <part_efi.h>
 /* disk/part_efi.c */
+
+#if TSAI
+void pte_to_disk_partition(block_dev_desc_t * dev_desc, gpt_entry *gpt_pte, disk_partition_t * info);
+#endif
+
 int get_partition_info_efi (block_dev_desc_t * dev_desc, int part, disk_partition_t *info);
 /**
  * get_partition_info_efi_by_name() - Find the specified GPT partition table entry

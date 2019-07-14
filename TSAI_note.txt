@@ -184,6 +184,7 @@ the data at offset 8064 is for bootloader env data
 
 =================================================
 dump_disk_partitions:                                                                                                               
+dump_disk_partitions:                                                                                                               
 partition(bootloaderdata): start=0x00000800, size=0x00001800, type=U-Boot                                                           
 partition(uboot): start=0x00002000, size=0x00004000, type=U-Boot                                                                    
 partition(trust): start=0x00006000, size=0x00004000, type=U-Boot                                                                    
@@ -198,7 +199,10 @@ partition(kpanic): start=0x000B4000, size=0x00002000, type=U-Boot
 partition(system): start=0x000B6000, size=0x00400000, type=U-Boot                                                                   
 partition(metadata): start=0x004B6000, size=0x00008000, type=U-Boot                                                                 
 partition(baseparameter): start=0x004BE000, size=0x00002000, type=U-Boot                                                            
-
+partition(userdata): start=0x004C0000, size=0x08000000, type=U-Boot                                                                 
+partition(ramfs): start=0x084C0000, size=0x00010000, type=U-Boot                                                                    
+partition(user): start=0x084D0000, size=0x01000000, type=U-Boot                                                                     
+partition(linuxroot): start=0x094D0000, size=0x13CF594E, type=U-Boot                                                                
 
 =========================================
 
@@ -211,5 +215,19 @@ sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wl 0x14000 '/home/julian
 sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wl 0xc000 '/home/julian/geekbox/mmallow/kernel/resource.img'
 
 sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wl 0x24000 '/home/julian/geekbox/mmallow/rockdev/Image-rk3368_box/boot.img'
+
+#write by partition name
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wlx kernel '/home/julian/geekbox/mmallow/kernel/kernel.img'
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wlx uboot /home/julian/geekbox/mmallow/u-boot/uboot.img
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wlx recovery '/home/julian/geekbox/mmallow/rockdev/Image-rk3368_box/recovery.img'
+
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wlx boot '/home/julian/geekbox/mmallow/rockdev/Image-rk3368_box/boot.img'
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wlx system '/home/julian/geekbox/mmallow/rockdev/Image-rk3368_box/system.img'
+
+
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' rd
+
+#mount
+mount -o noatime,nodiratime,nosuid,nodev,noauto_da_alloc,discard,errors=panic -t ext4 /dev/block/platform/ff500000.usb/by-name/userdata /mnt/media_rw 
 
 =============================================

@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
+#define DEBUG
 #include <common.h>
 #include <version.h>
 #include <errno.h>
@@ -256,4 +257,6 @@ int board_usb_init(int index, enum usb_init_type init)
 	printf("TSAI: board_usb_init() index %d type %d @%s\n", index, init, __FILE__);
 	return 0;
 }
+
+int tsai_mute_usbstorage_log = 0;
 

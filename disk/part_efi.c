@@ -299,6 +299,39 @@ int get_partition_info_efi(block_dev_desc_t * dev_desc, int part,
 	return 0;
 }
 
+#if TSAI
+/* gpt_pte:[in]
+ * info: [out]
+ * */
+void pte_to_disk_partition(block_dev_desc_t * dev_desc, gpt_entry *gpt_pte, disk_partition_t * info) {
+	info->start = (lbaint_t)le64_to_cpu(gpt_pte->starting_lba);
+	if (gpt_pte->starting_lba == gpt_pte->ending_lba && gpt_pte->starting_lba == 0)
+		info->size = 0;
+	else {
+		/* The ending LBA is inclusive, to calculate size, add 1 to it */
+		info->size = (lbaint_t)le64_to_cpu(gpt_pte->ending_lba) + 1
+				 - info->start;
+	}
+	info->blksz = dev_desc->blksz;
+
+	sprintf((char *)info->name, "%s",
+			print_efiname(gpt_pte));
+	sprintf((char *)info->type, "U-Boot");
+	info->bootable = is_bootable(gpt_pte);
+#ifdef CONFIG_PARTITION_UUIDS
+	uuid_bin_to_str(gpt_pte->unique_partition_guid.b, info->uuid,
+			UUID_STR_FORMAT_GUID);
+#endif
+#ifdef CONFIG_PARTITION_TYPE_GUID
+	uuid_bin_to_str(gpt_pte->partition_type_guid.b,
+			info->type_guid, UUID_STR_FORMAT_GUID);
+#endif
+	debug("%s: start 0x" LBAF ", size 0x" LBAF ", name %s\n", __func__,
+	      info->start, info->size, info->name);
+}
+
+#endif
+
 int get_partition_info_efi_by_name(block_dev_desc_t *dev_desc,
 	const char *name, disk_partition_t *info)
 {

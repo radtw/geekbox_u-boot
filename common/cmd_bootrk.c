@@ -44,7 +44,7 @@ extern bool is_rk81x_fg_init(void);
 #endif
 extern int rkimage_load_image(rk_boot_img_hdr *hdr,
 		const disk_partition_t *boot_ptn, const disk_partition_t *kernel_ptn);
-
+#if TSAI
 /* use StorageGetBootMedia() to obtain media ID
  * and use this function to convert it to a string for print
  */
@@ -68,7 +68,7 @@ const char* tsai_boot_media_string(void) {
 	uint32 media = StorageGetBootMedia();
 	return tsai_boot_media_id_string(media);
 }
-
+#endif
 /* Section for Android bootimage format support
  * Refer:
  * http://android.git.kernel.org/?p=platform/system/core.git;a=blob;f=mkbootimg/bootimg.h
@@ -541,8 +541,9 @@ int do_bootrk(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	const disk_partition_t* ptn = NULL;
 	bootm_headers_t images;
 	bool charge = false;
-
-	printf("TSAI do_bootrk fn=%p lr=%p media=%s @%s\n", do_bootrk, __builtin_return_address(0), tsai_boot_media_string(), __FILE__);
+#if TSAI
+	printf("TSAI do_bootrk fn=%p lr=%p media=%s @%s\n", do_bootrk, __builtin_return_address(0),
+			tsai_boot_media_string(), __FILE__);
 	{
 		int i;
 		for (i=0; i<argc; i++) {
@@ -550,7 +551,7 @@ int do_bootrk(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		}
 		printf("\n");
 	}
-
+#endif
 	if (argc >= 2) {
 		if (!strcmp(argv[1], "charge")) {
 			charge = true;
@@ -623,6 +624,11 @@ int do_bootrk(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 #ifdef CONFIG_BOOTM_LINUX
 	puts("bootrk: do_bootm_linux...\n");
+#if TSAI
+	if( StorageGetBootMedia()== BOOT_FROM_UMS) {
+		UMSDeInit(0); /* TSAI: often stuck right at booting linux kernel... so deinit UMS right before */
+	}
+#endif
 	do_bootm_linux(0, 0, NULL, &images);
 #endif /* CONFIG_BOOTM_LINUX */
 

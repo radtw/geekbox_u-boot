@@ -457,7 +457,29 @@ uint16 StorageGetBootMedia(void)
 {
    	return gpMemFun->flag;
 }
-
+#if TSAI
+const char* StorageGetBootMediaName(void)
+{
+	const char* ret;
+   	switch( gpMemFun->flag) {
+   	case BOOT_FROM_FLASH:
+   		ret = "NAND";
+   		break;
+   	case BOOT_FROM_EMMC:
+   		ret = "EMMC";
+   		break;
+   	case BOOT_FROM_SD0:
+   		ret = "SDCARD0";
+   		break;
+   	case BOOT_FROM_UMS:
+   		ret = "UMS";
+   		break;
+   	default:
+   		ret = "UNKNOWN";
+   	}
+   	return ret;
+}
+#endif
 uint32 StorageGetSDFwOffset(void)
 {
 	uint32 offset = 0;

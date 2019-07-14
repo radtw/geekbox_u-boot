@@ -1043,6 +1043,10 @@ static void usb_bin_fixup(struct usb_device_descriptor descriptor,
 }
 #endif /* CONFIG_USB_BIN_FIXUP */
 
+#if TSAI
+    extern int tsai_mute_usbstorage_log;
+#endif
+
 unsigned long usb_stor_read(int device, lbaint_t blknr,
 			    lbaint_t blkcnt, void *buffer)
 {
@@ -1054,7 +1058,8 @@ unsigned long usb_stor_read(int device, lbaint_t blknr,
 	int retry, i;
 	ccb *srb = &usb_ccb;
 #if TSAI
-	printf("TSAI: usb_stor_read lba %u + %u to %p\n", (uint)blknr, (uint)blkcnt, buffer);
+	if (!tsai_mute_usbstorage_log)
+		printf("TSAI: usb_stor_read lba %u + %u to %p\n", (uint)blknr, (uint)blkcnt, buffer);
 #endif
 	if (blkcnt == 0)
 		return 0;
@@ -1132,7 +1137,8 @@ unsigned long usb_stor_write(int device, lbaint_t blknr,
 	int retry, i;
 	ccb *srb = &usb_ccb;
 #if TSAI
-	printf("TSAI: usb_stor_write lba %u + %u to %p\n", (uint)blknr, (uint)blkcnt, buffer);
+	if (!tsai_mute_usbstorage_log)
+		printf("TSAI: usb_stor_write lba %u + %u to %p\n", (uint)blknr, (uint)blkcnt, buffer);
 #endif
 
 	if (blkcnt == 0)

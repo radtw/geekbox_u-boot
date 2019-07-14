@@ -897,7 +897,7 @@ void do_rockusb_cmd(void)
 	usbcmd.cmnd = usbcmd.cbw.CDB[0];
 	RKUSBINFO("CBW %x %x %x %x\n", usbcmd.cbw.Tag, usbcmd.cbw.Flags, usbcmd.cbw.Length, usbcmd.cmnd);
 #endif
-	printf("TSAI:do_rockusb_cmd @%s\n", __FILE__);
+	debug("TSAI:do_rockusb_cmd @%s\n", __FILE__);
 	switch (usbcmd.cmnd) {
 	case K_FW_TEST_UNIT_READY:
 		FW_TestUnitReady();
@@ -1387,6 +1387,7 @@ static void rkusb_lowformat_check(void)
 
 #if TSAI
 	extern int tsai_print_write_caller;
+    extern int tsai_mute_usbstorage_log;
 #endif
 
 
@@ -1399,24 +1400,27 @@ int do_rockusb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #ifdef CONFIG_RK_UDC
 	int ret;
 	RKUSBINFO("do_rockusb\n");
-	{
-		static int enter_repeat = 0;
-		if (!enter_repeat) {
-			printf("TSAI:do_rockusb=%p caller %p\n", do_rockusb, __builtin_return_address(0));
-			enter_repeat++;
-		}
-	}
 #if TSAI
-	printf("TSAI:do_rockusb argc=%d @%s %d\n", argc, __FILE__, __LINE__);
-	tsai_print_write_caller = 1;
-#endif
 	{
 		int i;
-		for (i=0; i<argc; i++) {
-			printf("%s ", argv[i]);
+		static int enter_count = 0;
+		if (enter_count < 10) {
+			printf("TSAI:do_rockusb argc=%d @%s %d\n", argc, __FILE__, __LINE__);
+			for (i=0; i<argc; i++) {
+				printf("%s ", argv[i]);
+			}
+			printf("\n");
+			if (enter_count < 1) { /* 1st time */
+				printf("TSAI:do_rockusb=%p caller %p\n", do_rockusb, __builtin_return_address(0));
+				printf("StorageMedia= %s\n", StorageGetBootMediaName());
+			}
 		}
-		printf("\n");
+		else {
+			tsai_mute_usbstorage_log = 1;
+		}
+		enter_count++;
 	}
+#endif
 
 	rkusb_init_endpoint_ptrs();
 	memset(&usbcmd, 0, sizeof(struct cmd_rockusb_interface));

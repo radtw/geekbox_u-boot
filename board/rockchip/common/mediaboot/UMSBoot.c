@@ -268,7 +268,11 @@ static uint32 __UMSGetCapacity(uint8 index)
 }
 
 /************************************************************/
-static void UMSDeInit(uint32 ChipSel)
+#if TSAI
+#else
+static
+#endif
+void UMSDeInit(uint32 ChipSel)
 {
 	printf("Deinit USB Host\n");
 
@@ -305,9 +309,14 @@ uint32_t g_tsai_gpt_header[512];
 uint32 UMSInit(uint32 ChipSel)
 {
 	uint ret = -1;
+#if TSAI
 	void* lr = __builtin_return_address(0);
-printf("TSAI UMSInit(fn=%p,lr=%p) ChipSel:%u @%s\n", UMSInit, lr, ChipSel, __FILE__);
-
+	printf("TSAI UMSInit(fn=%p,lr=%p) ChipSel:%u @%s\n", UMSInit, lr, ChipSel, __FILE__);
+	if (tsai_DetectKeyAbortUMS()) {
+		printf("TSAI: key pressed, indicating giving up UMS boot\n");
+		goto ForceQuit;
+	}
+#endif
 	/* Select active USB controller */
 	if (rk_usb_host_lookup()) {
 		printf("Could not find USB controller\n");

@@ -24,7 +24,7 @@ extern uint32 UMSGetCapacity(uint8 ChipSel);
 extern uint32 UMSGetBootMode(void);
 
 #if TSAI
-
+extern void UMSDeInit(uint32 ChipSel);
 extern block_dev_desc_t* UMSGetBlockDev(void);
 extern gpt_header* UMSGetGPTHeader(void);
 
