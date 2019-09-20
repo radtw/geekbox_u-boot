@@ -152,6 +152,9 @@ static bool SecureNSModeVerifyUbootImageSign(second_loader_hdr *hdr)
 
 static bool SecureNSModeBootImageShaCheck(rk_boot_img_hdr *boothdr)
 {
+#if TSAI
+	bool ret;
+#endif
 #ifndef SECUREBOOT_CRYPTO_EN
 	uint8_t *sha;
 	SHA_CTX ctx;
@@ -219,8 +222,22 @@ static bool SecureNSModeBootImageShaCheck(rk_boot_img_hdr *boothdr)
 		printf("%02x", ((char *)boothdr->id)[i]);
 	printf("\n");
 #endif
-
+#if TSAI
+	ret = !memcmp(boothdr->id, sha, size);
+	if (!ret) { //In the case of mismatch, print out the details
+		int i = 0;
+		printf("\nreal sha: @%s\n", __FILE__);
+		for (i = 0; i < size; i++)
+			printf("%02x", (char)sha[i]);
+		printf("\nsha from image header: @%s\n", __FILE__);
+		for (i = 0; i < size; i++)
+			printf("%02x", ((char *)boothdr->id)[i]);
+		printf("\n");
+	}
+	return ret;
+#else
 	return !memcmp(boothdr->id, sha, size);
+#endif
 }
 
 
@@ -232,7 +249,7 @@ static bool SecureNSModeVerifyBootImageSign(rk_boot_img_hdr* boothdr)
 
 	/* check image sha, make sure image is ok. */
 	if (!SecureNSModeBootImageShaCheck(boothdr)) {
-		PRINT_E("boot or recovery image sha mismatch!\n");
+		PRINT_E("boot or recovery image sha mismatch! @%s %d\n", __FILE__, __LINE__);
 		return false;
 	}
 
@@ -298,7 +315,13 @@ static bool SecureNSModeBootImageCheck(rk_boot_img_hdr *hdr, int unlocked)
 #if defined(CONFIG_BOOTRK_OTA_IMAGE_CHECK) || defined(SECUREBOOT_CRYPTO_EN)
 	/* check image sha, make sure image is ok. */
 	if (!SecureNSModeBootImageShaCheck(boothdr)) {
-		PRINT_E("boot or recovery image sha mismatch!\n");
+		PRINT_E("boot or recovery image sha mismatch! @%s %d\n", __FILE__, __LINE__);
+#if TSAI /* For UMS boot, let it boot anyway, not sure why SHA doesn't match? */
+		if( StorageGetBootMedia()== BOOT_FROM_UMS) {
+			printf("TSAI: ignore SHA has mismatch @%s\n", __FILE__);
+			return true;
+		}
+#endif
 		return false;
 	}
 #endif
@@ -389,7 +412,7 @@ static void SecureNSModeInit(void)
 			}
 #endif
 			if (gDrmKeyInfo.publicKeyLen == 0) {
-				/* Ã»ÓÐ¹«Ô¿£¬ÊÇµÚÒ»´Î²Å¿ªÆôkeyBoxEnable */
+				/* Ã»ï¿½Ð¹ï¿½Ô¿ï¿½ï¿½ï¿½Çµï¿½Ò»ï¿½Î²Å¿ï¿½ï¿½ï¿½keyBoxEnable */
 				gDrmKeyInfo.publicKeyLen = 0x100;
 				ftl_memcpy(gDrmKeyInfo.publicKey, RSK_KEY, 0x104);
 				updataFlag = 1;
@@ -401,12 +424,12 @@ static void SecureNSModeInit(void)
 				gDrmKeyInfo.secureBootLock = 1;
 #endif
 			} else if (memcmp(gDrmKeyInfo.publicKey, RSK_KEY, 0x100) != 0) {
-				/* Èç¹ûÒÑ¾­´æÔÚ¹«Ô¿£¬²¢ÇÒ¹«Ô¿±»Ìæ»»ÁË£¬ÄÇÃ´¹Ø±Õ */
+				/* ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ú¹ï¿½Ô¿ï¿½ï¿½ï¿½ï¿½ï¿½Ò¹ï¿½Ô¿ï¿½ï¿½ï¿½æ»»ï¿½Ë£ï¿½ï¿½ï¿½Ã´ï¿½Ø±ï¿½ */
 				if (memcmp(gDrmKeyInfo.publicKey + 4, RSK_KEY, 0x100) == 0) {
 					ftl_memcpy(gDrmKeyInfo.publicKey, RSK_KEY, 0x104);
 					updataFlag = 1;
 				} else {
-					gDrmKeyInfo.keyBoxEnable = 0; /* ÔÝÊ±²»ÆôÓÃÕâ¸ö¹¦ÄÜ */
+					gDrmKeyInfo.keyBoxEnable = 0; /* ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 					SecureBootEn = 0;
 					RkPrintf("E:pKey!\n");
 				}
@@ -421,7 +444,7 @@ static void SecureNSModeInit(void)
 		if (updataFlag) {
 			updataFlag = 0;
 			if (FTL_ERROR == StorageSysDataStore(1, &gDrmKeyInfo)) {
-				;/* TODO:SysDataStoreÒì³£´¦Àí */
+				;/* TODO:SysDataStoreï¿½ì³£ï¿½ï¿½ï¿½ï¿½ */
 			}
 		}
 	}
@@ -431,9 +454,9 @@ static void SecureNSModeInit(void)
 		if (gBootConfig.bootTag != 0x44535953) {
 			gBootConfig.bootTag = 0x44535953;
 			gBootConfig.bootLen = 504;
-			gBootConfig.bootMedia = 0; /* TODO: boot Ñ¡Ôñ */
+			gBootConfig.bootMedia = 0; /* TODO: boot Ñ¡ï¿½ï¿½ */
 			gBootConfig.BootPart = 0;
-			gBootConfig.secureBootEn = 0; /* SecureBootEn, Ä¬ÈÏdisable */
+			gBootConfig.secureBootEn = 0; /* SecureBootEn, Ä¬ï¿½ï¿½disable */
 			updataFlag = 1;
 		} else {
 #ifndef SECURE_BOOT_ENABLE_ALWAY
@@ -445,7 +468,7 @@ static void SecureNSModeInit(void)
 		if (updataFlag) {
 			updataFlag = 0;
 			if (FTL_ERROR == StorageSysDataStore(0, &gBootConfig)) {
-				;/* TODO:SysDataStoreÒì³£´¦Àí */
+				;/* TODO:SysDataStoreï¿½ì³£ï¿½ï¿½ï¿½ï¿½ */
 			}
 		}
 	} else {

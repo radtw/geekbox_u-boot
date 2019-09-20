@@ -296,7 +296,7 @@ int tsai_DetectKeyAbortUMS(void) {
 		menukey = getc();
 	# else
 		key = getc();  /* consume input	*/
-		printf("TSAI: key pressed code=%d\n", key);
+		printf("TSAI: key pressed code=%d @%s\n", key, __FILE__);
 	# endif
 		return 1;
 	}
@@ -313,7 +313,7 @@ uint32 UMSInit(uint32 ChipSel)
 	void* lr = __builtin_return_address(0);
 	printf("TSAI UMSInit(fn=%p,lr=%p) ChipSel:%u @%s\n", UMSInit, lr, ChipSel, __FILE__);
 	if (tsai_DetectKeyAbortUMS()) {
-		printf("TSAI: key pressed, indicating giving up UMS boot\n");
+		printf("TSAI: key pressed, indicating giving up UMS boot @%s %d\n", __FILE__, __LINE__);
 		goto ForceQuit;
 	}
 #endif
@@ -347,6 +347,9 @@ return -1;
 			if (tsai_DetectKeyAbortUMS()) {
 				printf("TSAI: key pressed, indicating giving up UMS boot\n");
 				goto ForceQuit;
+			}
+			else {
+				printf("TSAI: no key pressed, continue with UMS boot @%s\n", __FILE__);
 			}
 			//tentative read LBA 1 to see if it's GPT partition?
 			__UMSReadLBA(usb_stor_curr_dev, 1, g_tsai_gpt_header, 1);

@@ -300,8 +300,8 @@ int StorageWritePba(uint32 PBA, void *pbuf, uint32 nSec)
 	return ret;
 }
 #if TSAI
-int tsai_print_read_caller = 0;
-int tsai_print_write_caller = 0;
+	int tsai_print_read_caller = 0;
+	int tsai_print_write_caller = 0;
 #endif
 
 int StorageReadLba(uint32 LBA, void *pbuf, uint32 nSec)

@@ -21,6 +21,10 @@
  * HUB "Driver"
  * Probes device for being a hub and configurate it
  */
+#if 0 && TSAI
+/* enable all debug print */
+#define DEBUG
+#endif
 
 #include <common.h>
 #include <command.h>
@@ -89,7 +93,7 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 
 	dev = hub->pusb_dev;
 
-	debug("enabling power on all ports\n");
+	debug("enabling power on all ports @%s\n", __FILE__);
 	for (i = 0; i < dev->maxchild; i++) {
 		usb_set_port_feature(dev, i + 1, USB_PORT_FEAT_POWER);
 		debug("port %d returns %lX\n", i + 1, dev->status);
@@ -104,7 +108,9 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 
 void usb_hub_reset(void)
 {
-printf("TSAI: usb_hub_reset @%s\n",__FILE__);
+#if TSAI
+	printf("TSAI: usb_hub_reset @%s\n",__FILE__);
+#endif
 	usb_hub_index = 0;
 }
 
@@ -113,7 +119,7 @@ static struct usb_hub_device *usb_hub_allocate(void)
 	if (usb_hub_index < USB_MAX_HUB)
 		return &hub_dev[usb_hub_index++];
 
-	printf("ERROR: USB_MAX_HUB (%d) reached\n", USB_MAX_HUB);
+	printf("ERROR: USB_MAX_HUB (%d) reached @%s\n", USB_MAX_HUB, __FILE__);
 	return NULL;
 }
 
@@ -148,7 +154,7 @@ int hub_port_reset(struct usb_device *dev, int port,
 	ALLOC_CACHE_ALIGN_BUFFER(struct usb_port_status, portsts, 1);
 	unsigned short portstatus, portchange;
 
-	debug("hub_port_reset: resetting port %d...\n", port);
+	debug("hub_port_reset: resetting port %d... @%s\n", port, __FILE__);
 	for (tries = 0; tries < MAX_TRIES; tries++) {
 
 		usb_set_port_feature(dev, port + 1, USB_PORT_FEAT_RESET);
@@ -327,7 +333,7 @@ static int usb_hub_configure(struct usb_device *dev)
 		hub->desc.PortPowerCtrlMask[i] = descriptor->PortPowerCtrlMask[i];
 
 	dev->maxchild = descriptor->bNbrPorts;
-	debug("%d ports detected\n", dev->maxchild);
+	debug("usb_hub_configure %d ports detected @%s\n", dev->maxchild, __FILE__);
 
 	hubCharacteristics = get_unaligned(&hub->desc.wHubCharacteristics);
 	switch (hubCharacteristics & HUB_CHAR_LPSM) {
@@ -518,7 +524,7 @@ int usb_hub_probe(struct usb_device *dev, int ifnum)
 	if ((ep->bmAttributes & 3) != 3)
 		return 0;
 	/* We found a hub */
-	debug("USB hub found\n");
+	debug("USB hub found @%s\n", __FILE__);
 	ret = usb_hub_configure(dev);
 	return ret;
 }

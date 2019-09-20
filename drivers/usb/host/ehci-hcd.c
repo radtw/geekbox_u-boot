@@ -20,6 +20,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
  * MA 02111-1307 USA
  */
+#if 0 && TSAI
+/* enable all debug print, this produce flood of messages and will make uboot very slow */
+#define DEBUG
+#endif
+
 #include <common.h>
 #include <errno.h>
 #include <asm/byteorder.h>
@@ -172,8 +177,9 @@ static int ehci_reset(int index)
 {
 	uint32_t cmd;
 	int ret = 0;
-printf("TSAI ehci_reset idx %d @%s\n", index, __FILE__);
-
+#if TSAI
+	printf("TSAI ehci_reset idx %d @%s\n", index, __FILE__);
+#endif
 	cmd = ehci_readl(&ehcic[index].hcor->or_usbcmd);
 	cmd = (cmd & ~CMD_RUN) | CMD_RESET;
 	ehci_writel(&ehcic[index].hcor->or_usbcmd, cmd);

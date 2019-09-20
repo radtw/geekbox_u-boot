@@ -373,16 +373,18 @@ void dump_disk_partitions(void)
 	if (BOOT_FROM_UMS == StorageGetBootMedia() ) {
 		for (i=0; i<g_gpt_part_count; i++) { /* g_gpt_part_count may record 128, but not actually 128 partitions */
 			disk_partition_t* d = &g_gpt_partition_array[i];
-			if (d->start==0 && d->size==0)
+			if (d->start==0 && d->size==0) {
+				printf("NULL-terminator encountered. total %d partitions \n", i);
 				break;
-			printf("partition(%s): start=0x%08lX, size=0x%08lX, type=%s\n",
-				d->name, (uint)d->start, (uint)d->size, d->type);
+			}
+			printf("partition[%d](%s): start=0x%08X, size=0x%08X, type=%s\n",
+				i+1, d->name, (uint)d->start, (uint)d->size, d->type);
 		}
 		return;
 	}
 #endif
 	for(i = 0; i < gBootInfo.cmd_mtd.num_parts; i++) {
-		printf("partition(%s): start=0x%08lX, size=0x%08lX, type=%s\n", \
+		printf("partition(%s): start=0x%08X, size=0x%08X, type=%s\n", \
 				gBootInfo.cmd_mtd.parts[i].name, gBootInfo.cmd_mtd.parts[i].start, \
 				gBootInfo.cmd_mtd.parts[i].size, gBootInfo.cmd_mtd.parts[i].type);
 	}
@@ -445,6 +447,7 @@ int load_disk_partitions(void)
 
 				printf("TSAI: Read Parameters from LBA 1024\n");
 				UMSReadLBA(0, UMS_GPT_PARAMETER_LBA, param->parameter, 128);
+				param->length = 128 * 512;
 			}
 
 			if (ret) { /* error */
@@ -467,6 +470,7 @@ int load_disk_partitions(void)
 			dump_disk_partitions();
 
 			/* TSAI: for now I will just flash parameter text file to LBA 1024*/
+			printf("TSAI: parameter %p len %u \n", param->parameter, param->length);
 			ParseParam(&gBootInfo, param->parameter, param->length);
 			printf("TSAI: From Parameter, cmd=%s @%s\n", gBootInfo.cmd_line, __FILE__);
 			goto end;

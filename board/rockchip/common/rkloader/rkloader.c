@@ -134,7 +134,7 @@ static int dispose_bootloader_cmd(struct bootloader_message *msg,
 	int ret = 0;
 
 	if (0 == strcmp(msg->command, "bootloader")
-			|| 0 == strcmp(msg->command, "loader")) // ÐÂLoader²ÅÄÜÖ§³Ö"loader"ÃüÁî
+			|| 0 == strcmp(msg->command, "loader")) // ï¿½ï¿½Loaderï¿½ï¿½ï¿½ï¿½Ö§ï¿½ï¿½"loader"ï¿½ï¿½ï¿½ï¿½
 	{
 		bool reboot;
 
@@ -144,7 +144,7 @@ static int dispose_bootloader_cmd(struct bootloader_message *msg,
 			ret = -1;
 		}
 
-		{// ²»¹Ü³É¹¦Óë·ñ£¬½«miscÇå0
+		{// ï¿½ï¿½ï¿½Ü³É¹ï¿½ï¿½ï¿½ñ£¬½ï¿½miscï¿½ï¿½0
 			int i=0;
 			memset(g_32secbuf, 0, 32*528);
 			for(i=0; i<3; i++)
@@ -198,6 +198,43 @@ void rkloader_change_cmd_for_recovery(PBootInfo boot_info, char * rec_cmd)
 #define MISC_SIZE           (MISC_PAGES * PAGE_SIZE)//48K
 #define MISC_COMMAND_OFFSET (MISC_COMMAND_PAGE * PAGE_SIZE / RK_BLK_SIZE)//32
 
+#if TSAI
+
+int tsai_DoNotEnterRecovery(void) {
+	int abort = 0;
+	int bootdelay = 1;
+	unsigned long ts;
+
+	while ((bootdelay > 0) && (!abort)) {
+		--bootdelay;
+		/* delay 1000 ms */
+		ts = get_timer(0);
+		do {
+			if (tstc()) {	/* we got a key press	*/
+				abort  = 1;	/* don't auto boot	*/
+				bootdelay = 0;	/* no more delay	*/
+#if TSAI
+				putc('\n');
+				printf("TSAI: key pressed detected, abort @%s %d\n", __FILE__, __LINE__);
+#endif
+# ifdef CONFIG_MENUKEY
+				menukey = getc();
+# else
+				(void) getc();  /* consume input	*/
+# endif
+				break;
+			}
+			udelay(10000);
+		} while (!abort && get_timer(ts) < 1000);
+
+		printf("\b\b\b%2d ", bootdelay);
+	}
+
+    return abort;
+}
+
+#endif
+
 int rkloader_run_misc_cmd(void)
 {
 	struct bootloader_message *bmsg = NULL;
@@ -217,7 +254,25 @@ int rkloader_run_misc_cmd(void)
 		return false;
 	}
 	if(!strcmp(bmsg->command, "boot-recovery")) {
-		printf("got recovery cmd from misc.\n");
+		printf("got recovery cmd from misc. @%s\n", __FILE__);
+#if TSAI /* if it's UMS boot, for now give a option of not going into recovery */
+		{
+			uint32 media = StorageGetBootMedia();
+			if (BOOT_FROM_UMS == media) {
+				printf("TSAI: UMS mode, 1 Second to Cancel Recovery Mode @%s\n", __FILE__);
+				if (tsai_DoNotEnterRecovery()) {
+					printf("TSAI: UMS mode, skip RECOVERY MODE on PURPOSE @%s:%d\n", __FILE__, __LINE__);
+					/* clear boot-recovery message too */
+					memset(bmsg, 0, sizeof(struct bootloader_message));
+					StorageWriteLba(ptn->start + MISC_COMMAND_OFFSET, buf, DIV_ROUND_UP(
+										sizeof(struct bootloader_message), RK_BLK_SIZE), 0);
+					printf("TSAI: UMS mode, clear boot-recovery message in misc partition @%s:%d\n", __FILE__, __LINE__);
+
+					goto Leave;
+				}
+			}
+		}
+#endif
 #ifdef CONFIG_CMD_BOOTRK
 		char *const boot_cmd[] = {"bootrk", "recovery"};
 		do_bootrk(NULL, 0, ARRAY_SIZE(boot_cmd), boot_cmd);
@@ -240,7 +295,9 @@ int rkloader_run_misc_cmd(void)
 		}
 		return dispose_bootloader_cmd(bmsg, misc_part);
 	}
-
+#if TSAI
+Leave:
+#endif
 	return false;
 }
 

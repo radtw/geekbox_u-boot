@@ -222,7 +222,7 @@ int usb_stor_scan(int mode)
 	struct usb_device *dev;
 
 	if (mode == 1)
-		printf("       scanning usb for storage devices... ");
+		printf("       scanning usb for storage devices... @%s\n", __FILE__);
 
 	usb_disable_asynch(1); /* asynch transfer not allowed */
 
@@ -270,7 +270,7 @@ int usb_stor_scan(int mode)
 	} /* for */
 
 	usb_disable_asynch(0); /* asynch transfer allowed */
-	printf("%d Storage Device(s) found\n", usb_max_devs);
+	printf("%d Storage Device(s) found @%s\n", usb_max_devs, __FILE__);
 	if (usb_max_devs > 0)
 		return 0;
 	return -1;
@@ -1045,6 +1045,7 @@ static void usb_bin_fixup(struct usb_device_descriptor descriptor,
 
 #if TSAI
     extern int tsai_mute_usbstorage_log;
+    lbaint_t tsai_next_lba; /* to detect contiguous LBA write and mute */
 #endif
 
 unsigned long usb_stor_read(int device, lbaint_t blknr,
@@ -1058,8 +1059,15 @@ unsigned long usb_stor_read(int device, lbaint_t blknr,
 	int retry, i;
 	ccb *srb = &usb_ccb;
 #if TSAI
-	if (!tsai_mute_usbstorage_log)
-		printf("TSAI: usb_stor_read lba %u + %u to %p\n", (uint)blknr, (uint)blkcnt, buffer);
+	if (!tsai_mute_usbstorage_log) {
+		if (tsai_next_lba == blknr) {
+			/* mute*/
+		}
+		else {
+			printf("TSAI: usb_stor_read lba %u + %u to %p\n", (uint)blknr, (uint)blkcnt, buffer);
+		}
+		tsai_next_lba = blknr + blkcnt;
+	}
 #endif
 	if (blkcnt == 0)
 		return 0;
@@ -1137,8 +1145,15 @@ unsigned long usb_stor_write(int device, lbaint_t blknr,
 	int retry, i;
 	ccb *srb = &usb_ccb;
 #if TSAI
-	if (!tsai_mute_usbstorage_log)
-		printf("TSAI: usb_stor_write lba %u + %u to %p\n", (uint)blknr, (uint)blkcnt, buffer);
+	if (!tsai_mute_usbstorage_log) {
+		if (tsai_next_lba == blknr) {
+			/* mute*/
+		}
+		else {
+			printf("TSAI: usb_stor_write lba %u + %u to %p\n", (uint)blknr, (uint)blkcnt, buffer);
+		}
+		tsai_next_lba = blknr + blkcnt;
+	}
 #endif
 
 	if (blkcnt == 0)

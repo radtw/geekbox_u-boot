@@ -1,4 +1,11 @@
+===========================
+Build uboot for RK3368 geekbox for 1st time
 
+cd u-boot
+make rk3368_box_defconfig
+make V=1
+
+===========================
 
 check under what circumstance would "common/cmd_sata.c" being compiled.
 
@@ -231,3 +238,78 @@ sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' rd
 mount -o noatime,nodiratime,nosuid,nodev,noauto_da_alloc,discard,errors=panic -t ext4 /dev/block/platform/ff500000.usb/by-name/userdata /mnt/media_rw 
 
 =============================================
+
+experiment: format a Sandisk 32G usb stick for booting
+
+Disklabel type: gpt
+Disk identifier: 831F3C91-1F37-A643-898C-933298A895E8
+First LBA: 2048
+Last LBA: 60063710
+Alternative LBA: 60063743
+Partition entries LBA: 2
+Allocated partition entries: 128
+
+Device       Start      End  Sectors Type-UUID                            UUID                                 Name           Attrs
+/dev/sdc1     2048     8191     6144 0FC63DAF-8483-4772-8E79-3D69D8477DE4 998E0DFE-53F4-A042-990C-0BB420E58C46 bootloaderdata 
+/dev/sdc2     8192    24575    16384 0FC63DAF-8483-4772-8E79-3D69D8477DE4 DCC201CB-D8CF-E544-8EEA-224EB7E95791 uboot          
+/dev/sdc3    24576    40959    16384 0FC63DAF-8483-4772-8E79-3D69D8477DE4 4862281A-FF39-6242-949C-3D76D504141F trust          
+/dev/sdc4    40960    49151     8192 0FC63DAF-8483-4772-8E79-3D69D8477DE4 2470E8FC-6AEB-D843-9612-AFD7C56F8EF6 misc           
+/dev/sdc5    49152    81919    32768 0FC63DAF-8483-4772-8E79-3D69D8477DE4 B9F3FBAD-89B4-A94B-B6B1-B56762ED622C resource       
+/dev/sdc6    81920   147455    65536 0FC63DAF-8483-4772-8E79-3D69D8477DE4 0B228C18-A441-8F4B-8191-3F09E77FDF21 kernel         
+/dev/sdc7   147456   180223    32768 0FC63DAF-8483-4772-8E79-3D69D8477DE4 73E7708C-A098-1D46-8766-03D3063FEE39 boot           
+/dev/sdc8   180224   245759    65536 0FC63DAF-8483-4772-8E79-3D69D8477DE4 7703693D-BE61-1B43-A2B3-B7BAFB1085DF recovery       
+/dev/sdc9   245760   475135   229376 0FC63DAF-8483-4772-8E79-3D69D8477DE4 C1E70CE7-0390-464B-ACB6-DFEF8512F21C backup         
+/dev/sdc10  475136   737279   262144 0FC63DAF-8483-4772-8E79-3D69D8477DE4 80E26EFF-0F12-B840-A4FF-2AF6E77307F5 cache          
+/dev/sdc11  737280   745471     8192 0FC63DAF-8483-4772-8E79-3D69D8477DE4 31F2BC9A-BEBF-934D-8DDC-2D56F73E97EB kpanic         
+/dev/sdc12  745472  4939776  4194305 0FC63DAF-8483-4772-8E79-3D69D8477DE4 058DD4D8-E4D2-1F4E-ABD4-604606816F15 system         
+/dev/sdc13 4941824  4974591    32768 0FC63DAF-8483-4772-8E79-3D69D8477DE4 FF25CF31-0421-0345-BEA0-6F10DF756A1C metadata       
+/dev/sdc14 4974592  4982783     8192 0FC63DAF-8483-4772-8E79-3D69D8477DE4 D448153C-238B-4E4C-8F1A-7482F640BAE3 baseparameter  
+/dev/sdc15 4982784  5048319    65536 0FC63DAF-8483-4772-8E79-3D69D8477DE4 9228A616-9FB4-3A43-93E5-5BE7D339DC58 ramfs          
+/dev/sdc16 5048320 60063710 55015391 0FC63DAF-8483-4772-8E79-3D69D8477DE4 7A51F0F3-271C-0841-BD31-4BD7348F38A1 userdata 
+
+/dev/sdc1     2048     8191     6144    3M Linux filesystem
+/dev/sdc2     8192    24575    16384    8M Linux filesystem
+/dev/sdc3    24576    40959    16384    8M Linux filesystem
+/dev/sdc4    40960    49151     8192    4M Linux filesystem
+/dev/sdc5    49152    81919    32768   16M Linux filesystem
+/dev/sdc6    81920   147455    65536   32M Linux filesystem
+/dev/sdc7   147456   180223    32768   16M Linux filesystem
+/dev/sdc8   180224   245759    65536   32M Linux filesystem
+/dev/sdc9   245760   475135   229376  112M Linux filesystem
+/dev/sdc10  475136   737279   262144  128M Linux filesystem
+/dev/sdc11  737280   745471     8192    4M Linux filesystem
+/dev/sdc12  745472  4939776  4194305    2G Linux filesystem
+/dev/sdc13 4941824  4974591    32768   16M Linux filesystem
+/dev/sdc14 4974592  4982783     8192    4M Linux filesystem
+/dev/sdc15 4982784  5048319    65536   32M Linux filesystem
+/dev/sdc16 5048320 60063710 55015391 26.2G Linux filesystem
+
+#Prepare the UMS signature
+at offset 32768 = 0x8000, 4 byte 0xFCDC8C3B
+at offset 33384 = 0x8268, set value=1
+
+#use hexedit commandline tool to edit it
+sudo hexedit /dev/sdc
+
+Ctrl+X = save+quit
+
+#write parameters
+sudo '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' wl 1024 '/home/julian/geekbox/utils/rockdev/parameter'
+
+Without a SATA driver, bootloader can use this external Sandisk USB stick
+With both SATA and external Sandisk USB stick, external Sandisk USB stick will be used 
+
+#format these partitions to ext4 before use it for boot
+metadata
+userdata
+cache
+
+When external Sandisk USB stick alone, it can boot fine
+
+
+
+
+
+
+==============================================================
+

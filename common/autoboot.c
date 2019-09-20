@@ -151,7 +151,7 @@ static int abortboot_normal(int bootdelay)
 	printf(CONFIG_MENUPROMPT);
 #else
 	if (bootdelay >= 0) {
-		printf("TSAI: abortboot_normal %s\n", __FILE__);
+		printf("TSAI: abortboot_normal %s %d\n", __FILE__, __LINE__);
 		printf("Hit any key to stop autoboot: %2d ", bootdelay);
 	}
 #endif
@@ -178,6 +178,10 @@ static int abortboot_normal(int bootdelay)
 			if (tstc()) {	/* we got a key press	*/
 				abort  = 1;	/* don't auto boot	*/
 				bootdelay = 0;	/* no more delay	*/
+#if TSAI
+				putc('\n');
+				printf("TSAI: key pressed detected, abort boot @%s %d\n", __FILE__, __LINE__);
+#endif
 # ifdef CONFIG_MENUKEY
 				menukey = getc();
 # else
@@ -192,6 +196,11 @@ static int abortboot_normal(int bootdelay)
 	}
 
 	putc('\n');
+#if TSAI
+	if (!abort) {
+		printf("TSAI: NO KEY PRESS DETECTED, continue boot @%s %d\n", __FILE__, __LINE__);
+	}
+#endif
 
 #ifdef CONFIG_SILENT_CONSOLE
 	if (abort)

@@ -413,8 +413,19 @@
 /*#define CONFIG_CMD_USB_MASS_STORAGE*/ /* appears to use geekbox as mass storage so that PC can access it */
 /*#define CONFIG_USB_DWC_HCD*/ /* doesn't seem to work */
 #define CONFIG_USB_STORAGE
-#define CONFIG_USB_EHCI
-#define CONFIG_USB_EHCI_RK
+
+/*TSAI: 2020-06-07, attempt to use dwc2 USB echi driverm if fails with error
+ * SNPSID invalid (not DWC2 OTG device): 00000000 */
+#if 0
+	#undef CONFIG_USB_EHCI
+	#undef CONFIG_USB_EHCI_RK
+
+	#define CONFIG_USB_DWC2
+	#define CONFIG_USB_DWC2_REG_ADDR               0xFF500000
+#else
+	#define CONFIG_USB_EHCI
+	#define CONFIG_USB_EHCI_RK
+#endif
 
 #if 0 /* TSAI: for SATA experiment */
 #define CONFIG_SYS_SATA_MAX_DEVICE	1
