@@ -40,6 +40,8 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#define TSAI 1
+
 #include <dt-bindings/clock/rk3368-cru.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/interrupt-controller/irq.h>
@@ -771,6 +773,25 @@
 		interrupts = <GIC_PPI 9
 		      (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
 	};
+#if 0 && TSAI
+	//TSAI: 20200608 copied from kernel 4.4, but with looks like 0xffb00000 is not memory mapped
+	efuse: efuse@ffb00000 {
+		compatible = "rockchip,rk3368-efuse";
+		reg = <0x0 0xffb00000 0x0 0x20>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		clocks = <&cru PCLK_EFUSE256>;
+		clock-names = "pclk_efuse";
+
+		/* Data cells */
+		cpu_leakage: cpu-leakage@17 {
+			reg = <0x17 0x1>;
+		};
+		temp_adjust: temp-adjust@1f {
+			reg = <0x1f 0x1>;
+		};
+	};
+#endif
 
 	pinctrl: pinctrl {
 		compatible = "rockchip,rk3368-pinctrl";

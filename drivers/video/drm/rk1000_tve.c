@@ -92,7 +92,7 @@ int rk1000_tve_i2c_read(struct rk1000_tve *rk1000_tve, u8 reg, u8 *val)
 static int rk1000_tv_write_block(struct rk1000_tve *rk1000_tve,
 				 u8 reg, const u8 *buf, u8 len)
 {
-	int i, ret;
+	int i, ret = 0;
 
 	for (i = 0; i < len; i++) {
 		ret = rk1000_tve_i2c_write(rk1000_tve, reg + i, buf[i]);

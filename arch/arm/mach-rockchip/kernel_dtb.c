@@ -222,7 +222,9 @@ int init_kernel_dtb(void)
 	ulong fdt_addr;
 	void *ufdt_blob;
 	int ret;
-
+#if TSAI
+	printf("TSAI: init_kernel_dtb @%s\n", __FILE__);
+#endif
 	fdt_addr = env_get_ulong("fdt_addr_r", 16, 0);
 	if (!fdt_addr) {
 		printf("No Found FDT Load Address.\n");

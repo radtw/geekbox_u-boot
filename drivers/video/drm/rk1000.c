@@ -80,7 +80,7 @@ int rk1000_ctl_i2c_read(struct rk1000_ctl *rk1000_ctl, u8 reg, u8 *val)
 int rk1000_ctl_write_block(struct rk1000_ctl *rk1000_ctl,
 			   u8 reg, const u8 *buf, u8 len)
 {
-	int i, ret;
+	int i, ret = 0;
 
 	for (i = 0; i < len; i++) {
 		ret = rk1000_ctl_i2c_write(rk1000_ctl, reg + i, buf[i]);

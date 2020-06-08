@@ -458,6 +458,9 @@ int rockchip_read_dtb_file(void *fdt_addr)
 	char *hash;
 	u32 size;
 	int ret = -1;
+#if TSAI
+	printf("TSAI: rockchip_read_dtb_file %p @%s\n", fdt_addr, __FILE__);
+#endif
 
 #ifdef CONFIG_ROCKCHIP_FIT_IMAGE
 	if (ret) {
@@ -484,7 +487,7 @@ int rockchip_read_dtb_file(void *fdt_addr)
 	}
 #endif
 	if (ret) {
-		printf("Failed to load DTB\n");
+		printf("Failed to load DTB @%s\n", __FILE__);
 		return ret;
 	}
 

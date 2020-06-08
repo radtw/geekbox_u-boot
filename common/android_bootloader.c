@@ -321,7 +321,7 @@ static enum android_boot_mode android_bootloader_load_and_clear_mode(
 
 int android_bcb_write(char *cmd)
 {
-	struct android_bootloader_message message = {0};
+	struct android_bootloader_message message = {{0}};
 	disk_partition_t part_info;
 	struct blk_desc *dev_desc;
 	int ret;

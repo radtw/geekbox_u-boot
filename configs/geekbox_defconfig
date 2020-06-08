@@ -19,3 +19,26 @@ CONFIG_DEBUG_UART_ANNOUNCE=y
 CONFIG_DEBUG_UART_SKIP_INIT=y
 CONFIG_SYSRESET=y
 CONFIG_ERRNO_STR=y
+CONFIG_USB=y
+CONFIG_USB_EHCI_HCD=y
+CONFIG_USB_EHCI_GENERIC=y
+CONFIG_CMD_USB=y
+CONFIG_CMD_BOOT_ROCKCHIP=y
+CONFIG_ROCKCHIP_USB_BOOT=y
+CONFIG_MISC=y
+#CONFIG_ROCKCHIP_EFUSE shoule not be used
+CONFIG_LIB_RAND=y
+
+#TSAI: graphics
+CONFIG_DM_VIDEO=y
+#OF_LIVE needed for DRM
+CONFIG_OF_LIVE=y
+#with kernel dtb, it will read dtb from emmc and cannot initialze USB
+CONFIG_USING_KERNEL_DTB=n
+#I2C_EDID itself doesn't conflict with USB-PHY, but when enabling DRM, something else has conflicts with USB
+CONFIG_I2C_EDID=y
+#likely CONFIG_PHY has conflict with USB??, but DRM requires PHY
+CONFIG_PHY=y
+CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+
+CONFIG_DRM_ROCKCHIP=n

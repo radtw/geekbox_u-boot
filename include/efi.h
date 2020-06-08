@@ -94,6 +94,7 @@ typedef void *efi_handle_t;
 		(c) & 0xff, ((c) >> 8) & 0xff, \
 		(d0), (d1), (d2), (d3), (d4), (d5), (d6), (d7) } })
 
+
 /* Generic EFI table header */
 struct efi_table_hdr {
 	u64 signature;

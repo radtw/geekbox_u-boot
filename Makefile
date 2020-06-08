@@ -241,6 +241,15 @@ export	HOSTARCH HOSTOS
 
 #########################################################################
 
+#TSAI: copy from geekbox to make aarch64 toolchain default
+ARCHV ?= aarch64
+ifeq ($(ARCHV),aarch64)
+
+CROSS_COMPILE   ?= /home/julian/geekbox/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+
+
+endif # ARCHV=aarch64
+
 # set default to nothing for native builds
 ifeq ($(HOSTARCH),$(ARCH))
 CROSS_COMPILE ?=
@@ -590,6 +599,14 @@ KBUILD_CFLAGS	+= -Os
 else
 KBUILD_CFLAGS	+= -O2
 endif
+
+#TSAI: label my own modifications ##################################
+KBUILD_CFLAGS += -DTSAI=1 
+#KBUILD_CFLAGS += -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline -fno-unit-at-a-time -fno-toplevel-reorder -fno-predictive-commoning
+#TSAI: work-around error: 'for' loop initial declarations are only allowed in C99 or C11 mode
+#-std=c99, -std=gnu99, -std=c11 or -std=gnu11
+KBUILD_CFLAGS += -std=gnu11 
+##################################################################
 
 KBUILD_CFLAGS += $(call cc-option,-fno-stack-protector)
 KBUILD_CFLAGS += $(call cc-option,-fno-delete-null-pointer-checks)

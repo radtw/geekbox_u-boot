@@ -1067,6 +1067,9 @@ int rockchip_show_bmp(const char *bmp)
 {
 	struct display_state *s;
 	int ret = 0;
+#if TSAI
+	printf("TSAI rockchip_show_bmp %s\n", bmp);
+#endif
 
 	if (!bmp) {
 		list_for_each_entry(s, &rockchip_display_list, head)
@@ -1088,7 +1091,9 @@ int rockchip_show_logo(void)
 {
 	struct display_state *s;
 	int ret = 0;
-
+#if TSAI
+	printf("TSAI rockchip_show_logo\n");
+#endif
 	list_for_each_entry(s, &rockchip_display_list, head) {
 		s->logo.mode = s->logo_mode;
 		if (load_bmp_logo(&s->logo, s->ulogo_name))

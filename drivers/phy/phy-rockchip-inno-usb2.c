@@ -482,7 +482,9 @@ static int rockchip_usb2phy_probe(struct udevice *dev)
 	struct rockchip_usb2phy *rphy = dev_get_priv(dev);
 	struct udevice *parent = dev->parent;
 	u32 reg, index;
-
+#if TSAI
+	printf("rockchip_usb2phy_probe[in]\n");
+#endif
 	if (!strncmp(parent->name, "root_driver", 11) &&
 	    dev_read_bool(dev, "rockchip,grf"))
 		rphy->grf_base = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
@@ -535,6 +537,9 @@ static int rockchip_usb2phy_probe(struct udevice *dev)
 	if (rphy->phy_cfg->phy_tuning)
 		rphy->phy_cfg->phy_tuning(rphy);
 
+#if TSAI
+	printf("rockchip_usb2phy_probe[exit]\n");
+#endif
 	return 0;
 }
 

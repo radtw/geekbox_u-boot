@@ -169,7 +169,9 @@ static int boot_from_udisk(void)
 	struct blk_desc *desc;
 	char *devtype;
 	char *devnum;
-
+#if TSAI
+	printf("boot_from_udisk @%s\n", __FILE__);
+#endif
 	devtype = env_get("devtype");
 	devnum = env_get("devnum");
 
@@ -260,6 +262,9 @@ static void cmdline_handle(void)
 
 int board_late_init(void)
 {
+#if TSAI
+	printf("TSAI board_late_init @%s\n", __FILE__);
+#endif
 	rockchip_set_ethaddr();
 	rockchip_set_serialno();
 	setup_download_mode();

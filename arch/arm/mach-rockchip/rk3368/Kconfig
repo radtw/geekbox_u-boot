@@ -30,7 +30,9 @@ config TARGET_SHEEP
 	  for rk3368.
 
 config TARGET_GEEKBOX
+#TSAI: I want it to have board late init
 	bool "GeekBox"
+	select BOARD_LATE_INIT
 
 config TARGET_EVB_PX5
         bool "Evb-PX5"

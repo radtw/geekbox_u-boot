@@ -9,6 +9,9 @@
 
 #include <configs/rk3368_common.h>
 
+#if defined(CONFIG_CONSOLE_SCROLL_LINES)
+#undef CONFIG_CONSOLE_SCROLL_LINES
+#endif
 #define CONFIG_CONSOLE_SCROLL_LINES		10
 
 #endif

@@ -233,6 +233,7 @@ static int rockchip_rk3288_efuse_read(struct udevice *dev, int offset,
 	if (size > (max_size - offset))
 		size = max_size - offset;
 
+__asm("hlt #0");
 	/* Switch to read mode */
 	writel(RK3288_LOAD | RK3288_PGENB, &efuse->ctrl);
 	udelay(1);
@@ -278,6 +279,7 @@ static int rockchip_rk3288_efuse_secure_read(struct udevice *dev, int offset,
 	if (size > (max_size - offset))
 		size = max_size - offset;
 
+//__asm("hlt #0");
 	/* Switch to read mode */
 	sip_smc_secure_reg_write((ulong)&efuse->ctrl,
 				 RK3288_LOAD | RK3288_PGENB);
@@ -417,6 +419,12 @@ static const struct udevice_id rockchip_efuse_ids[] = {
 		.compatible = "rockchip,rk3328-efuse",
 		.data = (ulong)&rockchip_rk3328_efuse_read,
 	},
+#if TSAI
+	{
+		.compatible = "rockchip,rk3368-efuse",
+		.data = (ulong)&rockchip_rk3288_efuse_read,
+	},
+#endif
 	{
 		.compatible = "rockchip,rk3399-efuse",
 		.data = (ulong)&rockchip_rk3399_efuse_read,

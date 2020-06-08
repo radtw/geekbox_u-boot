@@ -7,6 +7,9 @@
  *
  * SPDX-License-Identifier:	GPL-2.0
  */
+#if 0 && TSAI
+#define DEBUG 1
+#endif
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
@@ -1679,10 +1682,13 @@ int ehci_setup_phy(struct udevice *dev, struct phy *phy, int index)
 	if (!phy)
 		return 0;
 
+#if 0 && TSAI
+	__asm("hlt #0");
+#endif
 	ret = generic_phy_get_by_index(dev, index, phy);
 	if (ret) {
 		if (ret != -ENOENT) {
-			dev_err(dev, "failed to get usb phy\n");
+			dev_err(dev, "failed to get usb phy @%s\n", __FILE__);
 			return ret;
 		}
 	} else {
