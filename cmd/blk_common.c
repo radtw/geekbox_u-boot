@@ -44,7 +44,7 @@ int blk_common_cmd(int argc, char * const argv[], enum if_type if_type,
 
 			if (!blk_show_device(if_type, dev)) {
 				*cur_devnump = dev;
-				printf("... is now current device\n");
+				printf("... is now current device @%s\n", __FILE__);
 			} else {
 				return CMD_RET_FAILURE;
 			}

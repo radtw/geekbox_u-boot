@@ -332,5 +332,8 @@
 	status = "okay";
 };
 
+&hdmi {
+	status = "okay";
+};
 
 #endif

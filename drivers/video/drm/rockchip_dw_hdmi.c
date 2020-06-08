@@ -809,6 +809,9 @@ const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
 
 static int rockchip_dw_hdmi_probe(struct udevice *dev)
 {
+#if TSAI
+	printf("TSAI:rockchip_dw_hdmi_probe \n");
+#endif
 	return 0;
 }
 

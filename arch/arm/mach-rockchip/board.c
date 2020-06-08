@@ -180,6 +180,7 @@ static int boot_from_udisk(void)
 		return 0;
 
 	if (!run_command("usb start", -1)) {
+//		__asm("hlt #0");
 		desc = blk_get_devnum_by_type(IF_TYPE_USB, 0);
 		if (!desc) {
 			printf("No usb device found\n");

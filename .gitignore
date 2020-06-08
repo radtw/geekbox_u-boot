@@ -86,3 +86,7 @@ GTAGS
 *.orig
 *~
 \#*#
+
+#TSAI
+*.bak
+

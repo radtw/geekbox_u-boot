@@ -31,8 +31,9 @@
  * Support for USB Mass Storage Devices (BBB) has been added. It has
  * only been tested with USB memory sticks.
  */
-
-
+#if 0 && TSAI
+#define DEBUG 1
+#endif
 #include <common.h>
 #include <command.h>
 #include <dm.h>
