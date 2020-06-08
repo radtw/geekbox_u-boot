@@ -109,59 +109,48 @@ U_BOOT_ENV_CALLBACK(baudrate, on_baudrate);
 	void name(void)						\
 		__attribute__((weak, alias("serial_null")));
 
-#ifdef CONFIG_ROCKCHIP
-serial_initfunc(rk30_serial_initialize);
-#else
-serial_initfunc(mpc8xx_serial_initialize);
-serial_initfunc(ns16550_serial_initialize);
-serial_initfunc(pxa_serial_initialize);
-serial_initfunc(s3c24xx_serial_initialize);
-serial_initfunc(s5p_serial_initialize);
-serial_initfunc(zynq_serial_initialize);
-serial_initfunc(bfin_serial_initialize);
-serial_initfunc(bfin_jtag_initialize);
-serial_initfunc(mpc512x_serial_initialize);
-serial_initfunc(uartlite_serial_initialize);
-serial_initfunc(au1x00_serial_initialize);
-serial_initfunc(asc_serial_initialize);
-serial_initfunc(jz_serial_initialize);
-serial_initfunc(mpc5xx_serial_initialize);
-serial_initfunc(mpc8260_scc_serial_initialize);
-serial_initfunc(mpc8260_smc_serial_initialize);
-serial_initfunc(mpc85xx_serial_initialize);
-serial_initfunc(iop480_serial_initialize);
-serial_initfunc(leon2_serial_initialize);
-serial_initfunc(leon3_serial_initialize);
-serial_initfunc(marvell_serial_initialize);
 serial_initfunc(amirix_serial_initialize);
+serial_initfunc(arc_serial_initialize);
+serial_initfunc(arm_dcc_initialize);
+serial_initfunc(asc_serial_initialize);
+serial_initfunc(atmel_serial_initialize);
+serial_initfunc(au1x00_serial_initialize);
+serial_initfunc(bfin_jtag_initialize);
+serial_initfunc(bfin_serial_initialize);
 serial_initfunc(bmw_serial_initialize);
+serial_initfunc(clps7111_serial_initialize);
 serial_initfunc(cogent_serial_initialize);
 serial_initfunc(cpci750_serial_initialize);
 serial_initfunc(evb64260_serial_initialize);
-serial_initfunc(ml2_serial_initialize);
-serial_initfunc(sconsole_serial_initialize);
-serial_initfunc(p3mx_serial_initialize);
-serial_initfunc(altera_jtag_serial_initialize);
-serial_initfunc(altera_serial_initialize);
-serial_initfunc(atmel_serial_initialize);
-serial_initfunc(lpc32xx_serial_initialize);
-serial_initfunc(mcf_serial_initialize);
-serial_initfunc(oc_serial_initialize);
-serial_initfunc(sandbox_serial_initialize);
-serial_initfunc(clps7111_serial_initialize);
 serial_initfunc(imx_serial_initialize);
-serial_initfunc(ks8695_serial_initialize);
+serial_initfunc(iop480_serial_initialize);
+serial_initfunc(jz_serial_initialize);
+serial_initfunc(leon2_serial_initialize);
+serial_initfunc(leon3_serial_initialize);
 serial_initfunc(lh7a40x_serial_initialize);
+serial_initfunc(lpc32xx_serial_initialize);
+serial_initfunc(marvell_serial_initialize);
 serial_initfunc(max3100_serial_initialize);
+serial_initfunc(mcf_serial_initialize);
+serial_initfunc(ml2_serial_initialize);
+serial_initfunc(mpc85xx_serial_initialize);
+serial_initfunc(mpc8xx_serial_initialize);
 serial_initfunc(mxc_serial_initialize);
-serial_initfunc(pl01x_serial_initialize);
-serial_initfunc(sa1100_serial_initialize);
-serial_initfunc(sh_serial_initialize);
-serial_initfunc(arm_dcc_initialize);
 serial_initfunc(mxs_auart_initialize);
-serial_initfunc(arc_serial_initialize);
-serial_initfunc(uniphier_serial_initialize);
-#endif /* CONFIG_ROCKCHIP */
+serial_initfunc(ns16550_serial_initialize);
+serial_initfunc(oc_serial_initialize);
+serial_initfunc(p3mx_serial_initialize);
+serial_initfunc(pl01x_serial_initialize);
+serial_initfunc(pxa_serial_initialize);
+serial_initfunc(s3c24xx_serial_initialize);
+serial_initfunc(s5p_serial_initialize);
+serial_initfunc(sa1100_serial_initialize);
+serial_initfunc(sandbox_serial_initialize);
+serial_initfunc(sconsole_serial_initialize);
+serial_initfunc(sh_serial_initialize);
+serial_initfunc(stm32_serial_initialize);
+serial_initfunc(uartlite_serial_initialize);
+serial_initfunc(zynq_serial_initialize);
 
 /**
  * serial_register() - Register serial driver with serial driver core
@@ -207,59 +196,48 @@ void serial_register(struct serial_device *dev)
  */
 void serial_initialize(void)
 {
-#ifdef CONFIG_ROCKCHIP
-	rk30_serial_initialize();
-#else
-	mpc8xx_serial_initialize();
-	ns16550_serial_initialize();
-	pxa_serial_initialize();
-	s3c24xx_serial_initialize();
-	s5p_serial_initialize();
-	mpc512x_serial_initialize();
-	bfin_serial_initialize();
-	bfin_jtag_initialize();
-	uartlite_serial_initialize();
-	zynq_serial_initialize();
-	au1x00_serial_initialize();
-	asc_serial_initialize();
-	jz_serial_initialize();
-	mpc5xx_serial_initialize();
-	mpc8260_scc_serial_initialize();
-	mpc8260_smc_serial_initialize();
-	mpc85xx_serial_initialize();
-	iop480_serial_initialize();
-	leon2_serial_initialize();
-	leon3_serial_initialize();
-	marvell_serial_initialize();
 	amirix_serial_initialize();
+	arc_serial_initialize();
+	arm_dcc_initialize();
+	asc_serial_initialize();
+	atmel_serial_initialize();
+	au1x00_serial_initialize();
+	bfin_jtag_initialize();
+	bfin_serial_initialize();
 	bmw_serial_initialize();
+	clps7111_serial_initialize();
 	cogent_serial_initialize();
 	cpci750_serial_initialize();
 	evb64260_serial_initialize();
-	ml2_serial_initialize();
-	sconsole_serial_initialize();
-	p3mx_serial_initialize();
-	altera_jtag_serial_initialize();
-	altera_serial_initialize();
-	atmel_serial_initialize();
-	lpc32xx_serial_initialize();
-	mcf_serial_initialize();
-	oc_serial_initialize();
-	sandbox_serial_initialize();
-	clps7111_serial_initialize();
 	imx_serial_initialize();
-	ks8695_serial_initialize();
+	iop480_serial_initialize();
+	jz_serial_initialize();
+	leon2_serial_initialize();
+	leon3_serial_initialize();
 	lh7a40x_serial_initialize();
+	lpc32xx_serial_initialize();
+	marvell_serial_initialize();
 	max3100_serial_initialize();
+	mcf_serial_initialize();
+	ml2_serial_initialize();
+	mpc85xx_serial_initialize();
+	mpc8xx_serial_initialize();
 	mxc_serial_initialize();
-	pl01x_serial_initialize();
-	sa1100_serial_initialize();
-	sh_serial_initialize();
-	arm_dcc_initialize();
 	mxs_auart_initialize();
-	arc_serial_initialize();
-	uniphier_serial_initialize();
-#endif /* CONFIG_ROCKCHIP */
+	ns16550_serial_initialize();
+	oc_serial_initialize();
+	p3mx_serial_initialize();
+	pl01x_serial_initialize();
+	pxa_serial_initialize();
+	s3c24xx_serial_initialize();
+	s5p_serial_initialize();
+	sa1100_serial_initialize();
+	sandbox_serial_initialize();
+	sconsole_serial_initialize();
+	sh_serial_initialize();
+	stm32_serial_initialize();
+	uartlite_serial_initialize();
+	zynq_serial_initialize();
 
 	serial_assign(default_serial_console()->name);
 }
@@ -292,14 +270,14 @@ static void serial_stub_puts(struct stdio_dev *sdev, const char *str)
 	dev->puts(str);
 }
 
-int serial_stub_getc(struct stdio_dev *sdev)
+static int serial_stub_getc(struct stdio_dev *sdev)
 {
 	struct serial_device *dev = sdev->priv;
 
 	return dev->getc();
 }
 
-int serial_stub_tstc(struct stdio_dev *sdev)
+static int serial_stub_tstc(struct stdio_dev *sdev)
 {
 	struct serial_device *dev = sdev->priv;
 
@@ -541,7 +519,7 @@ static const int bauds[] = CONFIG_SYS_BAUDRATE_TABLE;
  *
  * Do a loopback test of the currently selected serial port. This
  * function is only useful in the context of the POST testing framwork.
- * The serial port is firstly configured into loopback mode and then
+ * The serial port is first configured into loopback mode and then
  * characters are sent through it.
  *
  * Returns 0 on success, value otherwise.

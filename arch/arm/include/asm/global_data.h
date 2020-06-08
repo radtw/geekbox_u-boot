@@ -8,15 +8,19 @@
 #ifndef	__ASM_GBL_DATA_H
 #define __ASM_GBL_DATA_H
 
-#ifdef CONFIG_OMAP
-#include <asm/omap_boot.h>
-#endif
-
 /* Architecture-specific global data */
 struct arch_global_data {
 #if defined(CONFIG_FSL_ESDHC)
 	u32 sdhc_clk;
 #endif
+
+#if defined(CONFIG_U_QE)
+	u32 qe_clk;
+	u32 brg_clk;
+	uint mp_alloc_base;
+	uint mp_alloc_top;
+#endif /* CONFIG_U_QE */
+
 #ifdef CONFIG_AT91FAMILY
 	/* "static data" needed by at91's clock.c */
 	unsigned long	cpu_clk_rate_hz;
@@ -26,82 +30,50 @@ struct arch_global_data {
 	unsigned long	pllb_rate_hz;
 	unsigned long	at91_pllb_usb_init;
 #endif
-
-#ifdef CONFIG_ROCKCHIP
-	unsigned long	chiptype;
-	unsigned long	cpuversion;
-#ifdef CONFIG_RK_FB_DDREND
-	unsigned long	ddr_end;
-#endif
-
-#ifdef CONFIG_RK_CLOCK
-	/* "static data" needed by rk's clock.c */
-#if defined(CONFIG_RKCHIP_RK3288)
-	unsigned long	cpu_mp_rate_hz;
-	unsigned long	cpu_m0_rate_hz;
-	unsigned long	cpu_l2ram_rate_hz;
-
-	unsigned long	aclk_periph_rate_hz;
-	unsigned long	pclk_periph_rate_hz;
-	unsigned long	hclk_periph_rate_hz;
-
-	unsigned long	aclk_bus_rate_hz;
-	unsigned long	pclk_bus_rate_hz;
-	unsigned long	hclk_bus_rate_hz;
-#elif defined(CONFIG_RKCHIP_RK3368) || defined(CONFIG_RKCHIP_RK322X) || defined(CONFIG_RKCHIP_RK3366)
-	unsigned long	aclk_periph_rate_hz;
-	unsigned long	pclk_periph_rate_hz;
-	unsigned long	hclk_periph_rate_hz;
-
-	unsigned long	aclk_bus_rate_hz;
-	unsigned long	pclk_bus_rate_hz;
-	unsigned long	hclk_bus_rate_hz;
-#elif defined(CONFIG_RKCHIP_RK3036) || defined(CONFIG_RKCHIP_RK3126) || defined(CONFIG_RKCHIP_RK3128)
-	unsigned long	aclk_cpu_rate_hz;
-	unsigned long	pclk_cpu_rate_hz;
-	unsigned long	hclk_cpu_rate_hz;
-
-	unsigned long	aclk_periph_rate_hz;
-	unsigned long	pclk_periph_rate_hz;
-	unsigned long	hclk_periph_rate_hz;
-#elif defined(CONFIG_RKCHIP_RK3399)
-	unsigned long	aclk_periph_h_rate_hz;
-	unsigned long	pclk_periph_h_rate_hz;
-	unsigned long	hclk_periph_h_rate_hz;
-
-	unsigned long	aclk_periph_l0_rate_hz;
-	unsigned long	pclk_periph_l0_rate_hz;
-	unsigned long	hclk_periph_l0_rate_hz;
-
-	unsigned long	pclk_periph_l1_rate_hz;
-	unsigned long	hclk_periph_l1_rate_hz;
-#else
-	#error "PLS config chiptype for clock!"
-#endif
-
-#endif /* CONFIG_RK_CLOCK */
-#endif /* CONFIG_ROCKCHIP */
 	/* "static data" needed by most of timer.c on ARM platforms */
 	unsigned long timer_rate_hz;
-	unsigned long tbu;
-	unsigned long tbl;
+	unsigned int tbu;
+	unsigned int tbl;
 	unsigned long lastinc;
 	unsigned long long timer_reset_value;
 #if !(defined(CONFIG_SYS_ICACHE_OFF) && defined(CONFIG_SYS_DCACHE_OFF))
 	unsigned long tlb_addr;
 	unsigned long tlb_size;
+#if defined(CONFIG_ARM64)
+	unsigned long tlb_fillptr;
+	unsigned long tlb_emerg;
+#endif
+#endif
+#ifdef CONFIG_SYS_MEM_RESERVE_SECURE
+#define MEM_RESERVE_SECURE_SECURED	0x1
+#define MEM_RESERVE_SECURE_MAINTAINED	0x2
+#define MEM_RESERVE_SECURE_ADDR_MASK	(~0x3)
+	/*
+	 * Secure memory addr
+	 * This variable needs maintenance if the RAM base is not zero,
+	 * or if RAM splits into non-consecutive banks. It also has a
+	 * flag indicating the secure memory is marked as secure by MMU.
+	 * Flags used: 0x1 secured
+	 *             0x2 maintained
+	 */
+	phys_addr_t secure_ram;
+	unsigned long tlb_allocated;
+#endif
+#ifdef CONFIG_RESV_RAM
+	/*
+	 * Reserved RAM for memory resident, eg. Management Complex (MC)
+	 * driver which continues to run after U-Boot exits.
+	 */
+	phys_addr_t resv_ram;
 #endif
 
-#ifdef CONFIG_OMAP
-	struct omap_boot_parameters omap_boot_params;
+#ifdef CONFIG_ARCH_OMAP2PLUS
+	u32 omap_boot_device;
+	u32 omap_boot_mode;
+	u8 omap_ch_flags;
 #endif
-#ifdef CONFIG_ROCKCHIP
-	unsigned long rk_global_buf_addr;
-	unsigned long rk_boot_buf_addr;
-#endif
-#ifdef CONFIG_CMD_FASTBOOT
-	unsigned long fastboot_buf_addr;
-	unsigned long fastboot_log_buf_addr;
+#if defined(CONFIG_FSL_LSCH3) && defined(CONFIG_SYS_FSL_HAS_DP_DDR)
+	unsigned long mem2_clk;
 #endif
 };
 

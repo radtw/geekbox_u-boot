@@ -23,7 +23,7 @@ int check_reg(struct pmic *p, u32 reg)
 	if (reg >= p->number_of_regs) {
 		printf("<reg num> = %d is invalid. Should be less than %d\n",
 		       reg, p->number_of_regs);
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -34,7 +34,7 @@ int pmic_set_output(struct pmic *p, u32 reg, int out, int on)
 	u32 val;
 
 	if (pmic_reg_read(p, reg, &val))
-		return -1;
+		return -ENOTSUPP;
 
 	if (on)
 		val |= out;
@@ -42,7 +42,7 @@ int pmic_set_output(struct pmic *p, u32 reg, int out, int on)
 		val &= ~out;
 
 	if (pmic_reg_write(p, reg, val))
-		return -1;
+		return -ENOTSUPP;
 
 	return 0;
 }
@@ -59,7 +59,7 @@ static int pmic_dump(struct pmic *p)
 
 	if (!p) {
 		puts("Wrong PMIC name!\n");
-		return -1;
+		return -ENODEV;
 	}
 
 	pmic_show_info(p);
@@ -99,7 +99,7 @@ struct pmic *pmic_get(const char *s)
 	struct pmic *p;
 
 	list_for_each_entry(p, &pmic_list, list) {
-		if (p->name && strcmp(p->name, s) == 0) {
+		if (strcmp(p->name, s) == 0) {
 			debug("%s: pmic %s -> 0x%p\n", __func__, p->name, p);
 			return p;
 		}

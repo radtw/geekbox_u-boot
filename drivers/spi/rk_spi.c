@@ -1,463 +1,474 @@
 /*
  * spi driver for rockchip
  *
- * (C) Copyright 2008-2016 Fuzhou Rockchip Electronics Co., Ltd
+ * (C) Copyright 2015 Google, Inc
+ *
+ * (C) Copyright 2008-2013 Rockchip Electronics
  * Peter, Software Engineering, <superpeter.cai@gmail.com>.
  *
- * SPDX-License-Identifier:	GPL-2.0+
+ * SPDX-License-Identifier:     GPL-2.0+
  */
+
 #include <common.h>
-#include <malloc.h>
+#include <clk.h>
+#include <dm.h>
+#include <dt-structs.h>
+#include <errno.h>
 #include <spi.h>
-#include <asm/errno.h>
+#include <linux/errno.h>
 #include <asm/io.h>
-#include <asm/arch/rkplat.h>
+#include <asm/arch/clock.h>
+#include <asm/arch/periph.h>
+#include <dm/pinctrl.h>
 #include "rk_spi.h"
 
-static void rkspi_dump_regs(struct rk_spi_slave *spi) {
-	debug("RK SPI registers:\n");
-	debug("=================================\n");
-	debug("CTRL0: \t\t0x%08x\n", rkspi_readl(spi, SPI_CTRLR0));
-	debug("CTRL1: \t\t0x%08x\n", rkspi_readl(spi, SPI_CTRLR1));
-	debug("SSIENR: \t\t0x%08x\n", rkspi_readl(spi, SPI_ENR));
-	debug("SER: \t\t0x%08x\n", rkspi_readl(spi, SPI_SER));
-	debug("BAUDR: \t\t0x%08x\n", rkspi_readl(spi, SPI_BAUDR));
-	debug("TXFTLR: \t\t0x%08x\n", rkspi_readl(spi, SPI_TXFTLR));
-	debug("RXFTLR: \t\t0x%08x\n", rkspi_readl(spi, SPI_RXFTLR));
-	debug("TXFLR: \t\t0x%08x\n", rkspi_readl(spi, SPI_TXFLR));
-	debug("RXFLR: \t\t0x%08x\n", rkspi_readl(spi, SPI_RXFLR));
-	debug("SR: \t\t0x%08x\n", rkspi_readl(spi, SPI_SR));
-	debug("IMR: \t\t0x%08x\n", rkspi_readl(spi, SPI_IMR));
-	debug("ISR: \t\t0x%08x\n", rkspi_readl(spi, SPI_ISR));
-	debug("DMACR: \t\t0x%08x\n", rkspi_readl(spi, SPI_DMACR));
-	debug("DMATDLR: \t0x%08x\n", rkspi_readl(spi, SPI_DMATDLR));
-	debug("DMARDLR: \t0x%08x\n", rkspi_readl(spi, SPI_DMARDLR));
-	debug("=================================\n");
+DECLARE_GLOBAL_DATA_PTR;
+
+/* Change to 1 to output registers at the start of each transaction */
+#define DEBUG_RK_SPI	0
+
+struct rockchip_spi_platdata {
+#if CONFIG_IS_ENABLED(OF_PLATDATA)
+	struct dtd_rockchip_rk3288_spi of_plat;
+#endif
+	s32 frequency;		/* Default clock frequency, -1 for none */
+	fdt_addr_t base;
+	uint deactivate_delay_us;	/* Delay to wait after deactivate */
+	uint activate_delay_us;		/* Delay to wait after activate */
+};
+
+struct rockchip_spi_priv {
+	struct rockchip_spi *regs;
+	struct clk clk;
+	unsigned int max_freq;
+	unsigned int mode;
+	ulong last_transaction_us;	/* Time of last transaction end */
+	u8 bits_per_word;		/* max 16 bits per word */
+	u8 n_bytes;
+	unsigned int speed_hz;
+	unsigned int last_speed_hz;
+	unsigned int tmode;
+	uint input_rate;
+};
+
+#define SPI_FIFO_DEPTH		32
+
+static void rkspi_dump_regs(struct rockchip_spi *regs)
+{
+	debug("ctrl0: \t\t0x%08x\n", readl(&regs->ctrlr0));
+	debug("ctrl1: \t\t0x%08x\n", readl(&regs->ctrlr1));
+	debug("ssienr: \t\t0x%08x\n", readl(&regs->enr));
+	debug("ser: \t\t0x%08x\n", readl(&regs->ser));
+	debug("baudr: \t\t0x%08x\n", readl(&regs->baudr));
+	debug("txftlr: \t\t0x%08x\n", readl(&regs->txftlr));
+	debug("rxftlr: \t\t0x%08x\n", readl(&regs->rxftlr));
+	debug("txflr: \t\t0x%08x\n", readl(&regs->txflr));
+	debug("rxflr: \t\t0x%08x\n", readl(&regs->rxflr));
+	debug("sr: \t\t0x%08x\n", readl(&regs->sr));
+	debug("imr: \t\t0x%08x\n", readl(&regs->imr));
+	debug("isr: \t\t0x%08x\n", readl(&regs->isr));
+	debug("dmacr: \t\t0x%08x\n", readl(&regs->dmacr));
+	debug("dmatdlr: \t0x%08x\n", readl(&regs->dmatdlr));
+	debug("dmardlr: \t0x%08x\n", readl(&regs->dmardlr));
 }
 
-static inline void rkspi_enable_chip(struct rk_spi_slave *spi, int enable)
+static void rkspi_enable_chip(struct rockchip_spi *regs, bool enable)
 {
-	rkspi_writel(spi, SPI_ENR, (enable ? 1 : 0));
+	writel(enable ? 1 : 0, &regs->enr);
 }
 
-static inline void rkspi_set_clk(struct rk_spi_slave *spi, u16 div)
+static void rkspi_set_clk(struct rockchip_spi_priv *priv, uint speed)
 {
-	rkspi_writel(spi, SPI_BAUDR, div);
+	/*
+	 * We should try not to exceed the speed requested by the caller:
+	 * when selecting a divider, we need to make sure we round up.
+	 */
+	uint clk_div = DIV_ROUND_UP(priv->input_rate, speed);
+
+	/* The baudrate register (BAUDR) is defined as a 32bit register where
+	 * the upper 16bit are reserved and having 'Fsclk_out' in the lower
+	 * 16bits with 'Fsclk_out' defined as follows:
+	 *
+	 *   Fsclk_out = Fspi_clk/ SCKDV
+	 *   Where SCKDV is any even value between 2 and 65534.
+	 */
+	if (clk_div > 0xfffe) {
+		clk_div = 0xfffe;
+		debug("%s: can't divide down to %d Hz (actual will be %d Hz)\n",
+		      __func__, speed, priv->input_rate / clk_div);
+	}
+
+	/* Round up to the next even 16bit number */
+	clk_div = (clk_div + 1) & 0xfffe;
+
+	debug("spi speed %u, div %u\n", speed, clk_div);
+
+	clrsetbits_le32(&priv->regs->baudr, 0xffff, clk_div);
+	priv->last_speed_hz = speed;
 }
 
-static int rkspi_wait_till_not_busy(struct rk_spi_slave *spi)
+static int rkspi_wait_till_not_busy(struct rockchip_spi *regs)
 {
-	unsigned int delay = 1000;
+	unsigned long start;
 
-	while (delay--) {
-		if (!(rkspi_readw(spi, SPI_SR) & SR_BUSY)) {
-			return 0;
+	start = get_timer(0);
+	while (readl(&regs->sr) & SR_BUSY) {
+		if (get_timer(start) > ROCKCHIP_SPI_TIMEOUT_MS) {
+			debug("RK SPI: Status keeps busy for 1000us after a read/write!\n");
+			return -ETIMEDOUT;
 		}
-
-		udelay(1);
 	}
 
-	printf("RK SPI: Status keeps busy for 1000us after a read/write!\n");
-	return -1;
+	return 0;
 }
 
-static int rkspi_wait_till_tf_empty(struct rk_spi_slave *spi)
+static void spi_cs_activate(struct udevice *dev, uint cs)
 {
-	unsigned int delay = 1000;
+	struct udevice *bus = dev->parent;
+	struct rockchip_spi_platdata *plat = bus->platdata;
+	struct rockchip_spi_priv *priv = dev_get_priv(bus);
+	struct rockchip_spi *regs = priv->regs;
 
-	while (delay--) {
-		if (rkspi_readw(spi, SPI_SR) & SR_TF_EMPT) {
-			return 0;
-		}
-
-		udelay(1);
+	/* If it's too soon to do another transaction, wait */
+	if (plat->deactivate_delay_us && priv->last_transaction_us) {
+		ulong delay_us;		/* The delay completed so far */
+		delay_us = timer_get_us() - priv->last_transaction_us;
+		if (delay_us < plat->deactivate_delay_us)
+			udelay(plat->deactivate_delay_us - delay_us);
 	}
 
-	printf("DW SPI: Status noe empty for 1000us after a read/write!\n");
-	return -1;
+	debug("activate cs%u\n", cs);
+	writel(1 << cs, &regs->ser);
+	if (plat->activate_delay_us)
+		udelay(plat->activate_delay_us);
 }
 
-static void rkspi_flush(struct rk_spi_slave *spi)
+static void spi_cs_deactivate(struct udevice *dev, uint cs)
 {
-	while (!(rkspi_readw(spi, SPI_SR) & SR_RF_EMPT))
-		rkspi_readw(spi, SPI_RXDR);
+	struct udevice *bus = dev->parent;
+	struct rockchip_spi_platdata *plat = bus->platdata;
+	struct rockchip_spi_priv *priv = dev_get_priv(bus);
+	struct rockchip_spi *regs = priv->regs;
 
-	rkspi_wait_till_not_busy(spi);
+	debug("deactivate cs%u\n", cs);
+	writel(0, &regs->ser);
+
+	/* Remember time of this transaction so we can honour the bus delay */
+	if (plat->deactivate_delay_us)
+		priv->last_transaction_us = timer_get_us();
 }
 
-static void rkspi_cs_control(struct rk_spi_slave *spi, uint32 cs, u8 flag)
+#if CONFIG_IS_ENABLED(OF_PLATDATA)
+static int conv_of_platdata(struct udevice *dev)
 {
-	if (flag)
-		rkspi_writel(spi, SPI_SER, 1 << cs);
-	else 		
-		rkspi_writel(spi, SPI_SER, 0);
-}
+	struct rockchip_spi_platdata *plat = dev->platdata;
+	struct dtd_rockchip_rk3288_spi *dtplat = &plat->of_plat;
+	struct rockchip_spi_priv *priv = dev_get_priv(dev);
+	int ret;
 
-static void rkspi_iomux_init(unsigned int bus, unsigned int cs)
+	plat->base = dtplat->reg[0];
+	plat->frequency = 20000000;
+	ret = clk_get_by_index_platdata(dev, 0, dtplat->clocks, &priv->clk);
+	if (ret < 0)
+		return ret;
+	dev->req_seq = 0;
+
+	return 0;
+}
+#endif
+
+static int rockchip_spi_ofdata_to_platdata(struct udevice *bus)
 {
-    rk_spi_iomux_config(RK_SPI0_CS0_IOMUX+2*bus+cs);
-}
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+	struct rockchip_spi_platdata *plat = dev_get_platdata(bus);
+	struct rockchip_spi_priv *priv = dev_get_priv(bus);
+	int ret;
 
-static int rkspi_null_writer(struct rk_spi_slave *spi)
-{
-	u8 n_bytes = spi->n_bytes;
+	plat->base = dev_read_addr(bus);
 
-	if ((rkspi_readw(spi, SPI_SR) & SR_TF_FULL)
-		|| (spi->tx == spi->tx_end))
-		return 0;
-
-	rkspi_writew(spi, SPI_TXDR, 0);
-	spi->tx += n_bytes;
-
-	return 1;
-}
-
-static int rkspi_null_reader(struct rk_spi_slave *spi)
-{
-	u8 n_bytes = spi->n_bytes;
-
-	while ((!(rkspi_readw(spi, SPI_SR) & SR_RF_EMPT))
-		&& (spi->rx < spi->rx_end)) {
-		rkspi_readw(spi, SPI_RXDR);
-		spi->rx += n_bytes;
-	}
-	rkspi_wait_till_not_busy(spi);
-
-	return spi->rx == spi->rx_end;
-}
-
-static int rkspi_u8_writer(struct rk_spi_slave *spi)
-{	
-	rkspi_dump_regs(spi);
-
-	if ((rkspi_readw(spi, SPI_SR) & SR_TF_FULL)
-		|| (spi->tx == spi->tx_end))
-		return 0;
-
-	rkspi_writew(spi, SPI_TXDR, *(u8 *)(spi->tx));
-	++spi->tx;
-
-	return 1;
-}
-
-static int rkspi_u8_reader(struct rk_spi_slave *spi)
-{
-	rkspi_dump_regs(spi);
-
-	while (!(rkspi_readw(spi, SPI_SR) & SR_RF_EMPT)
-		&& (spi->rx < spi->rx_end)) {
-		*(u8 *)(spi->rx) = rkspi_readw(spi, SPI_RXDR) & 0xFFU;
-		++spi->rx;
+	ret = clk_get_by_index(bus, 0, &priv->clk);
+	if (ret < 0) {
+		debug("%s: Could not get clock for %s: %d\n", __func__,
+		      bus->name, ret);
+		return ret;
 	}
 
-	rkspi_wait_till_not_busy(spi);
+	plat->frequency =
+		dev_read_u32_default(bus, "spi-max-frequency", 50000000);
+	plat->deactivate_delay_us =
+		dev_read_u32_default(bus, "spi-deactivate-delay", 0);
+	plat->activate_delay_us =
+		dev_read_u32_default(bus, "spi-activate-delay", 0);
 
-	return spi->rx == spi->rx_end;
+	debug("%s: base=%x, max-frequency=%d, deactivate_delay=%d\n",
+	      __func__, (uint)plat->base, plat->frequency,
+	      plat->deactivate_delay_us);
+#endif
+
+	return 0;
 }
 
-static int rkspi_u16_writer(struct rk_spi_slave *spi)
-{	
-	if ((rkspi_readw(spi, SPI_SR) & SR_TF_FULL)
-		|| (spi->tx == spi->tx_end))
-		return 0;
-
-	rkspi_writew(spi, SPI_TXDR, *(u16 *)(spi->tx));
-	spi->tx += 2;
-
-	return 1;
-}
-
-static int rkspi_u16_reader(struct rk_spi_slave *spi)
+static int rockchip_spi_calc_modclk(ulong max_freq)
 {
-	u16 temp;
+	/*
+	 * While this is not strictly correct for the RK3368, as the
+	 * GPLL will be 576MHz, things will still work, as the
+	 * clk_set_rate(...) implementation in our clock-driver will
+	 * chose the next closest rate not exceeding what we request
+	 * based on the output of this function.
+	 */
 
-	while (!(rkspi_readw(spi, SPI_SR) & SR_RF_EMPT)
-		&& (spi->rx < spi->rx_end)) {
-		temp = rkspi_readw(spi, SPI_RXDR);
-		*(u16 *)(spi->rx) = temp;
-		spi->rx += 2;
+	unsigned div;
+	const unsigned long gpll_hz = 594000000UL;
+
+	/*
+	 * We need to find an input clock that provides at least twice
+	 * the maximum frequency and can be generated from the assumed
+	 * speed of GPLL (594MHz) using an integer divider.
+	 *
+	 * To give us more achievable bitrates at higher speeds (these
+	 * are generated by dividing by an even 16-bit integer from
+	 * this frequency), we try to have an input frequency of at
+	 * least 4x our max_freq.
+	 */
+
+	div = DIV_ROUND_UP(gpll_hz, max_freq * 4);
+	return gpll_hz / div;
+}
+
+static int rockchip_spi_probe(struct udevice *bus)
+{
+	struct rockchip_spi_platdata *plat = dev_get_platdata(bus);
+	struct rockchip_spi_priv *priv = dev_get_priv(bus);
+	int ret;
+
+	debug("%s: probe\n", __func__);
+#if CONFIG_IS_ENABLED(OF_PLATDATA)
+	ret = conv_of_platdata(bus);
+	if (ret)
+		return ret;
+#endif
+	priv->regs = (struct rockchip_spi *)plat->base;
+
+	priv->last_transaction_us = timer_get_us();
+	priv->max_freq = plat->frequency;
+
+	/* Clamp the value from the DTS against any hardware limits */
+	if (priv->max_freq > ROCKCHIP_SPI_MAX_RATE)
+		priv->max_freq = ROCKCHIP_SPI_MAX_RATE;
+
+	/* Find a module-input clock that fits with the max_freq setting */
+	ret = clk_set_rate(&priv->clk,
+			   rockchip_spi_calc_modclk(priv->max_freq));
+	if (ret < 0) {
+		debug("%s: Failed to set clock: %d\n", __func__, ret);
+		return ret;
+	}
+	priv->input_rate = ret;
+	debug("%s: rate = %u\n", __func__, priv->input_rate);
+	priv->bits_per_word = 8;
+	priv->tmode = TMOD_TR; /* Tx & Rx */
+
+	return 0;
+}
+
+static int rockchip_spi_claim_bus(struct udevice *dev)
+{
+	struct udevice *bus = dev->parent;
+	struct rockchip_spi_priv *priv = dev_get_priv(bus);
+	struct rockchip_spi *regs = priv->regs;
+	u8 spi_dfs, spi_tf;
+	uint ctrlr0;
+
+	/* Disable the SPI hardware */
+	rkspi_enable_chip(regs, 0);
+
+	switch (priv->bits_per_word) {
+	case 8:
+		priv->n_bytes = 1;
+		spi_dfs = DFS_8BIT;
+		spi_tf = HALF_WORD_OFF;
+		break;
+	case 16:
+		priv->n_bytes = 2;
+		spi_dfs = DFS_16BIT;
+		spi_tf = HALF_WORD_ON;
+		break;
+	default:
+		debug("%s: unsupported bits: %dbits\n", __func__,
+		      priv->bits_per_word);
+		return -EPROTONOSUPPORT;
 	}
 
-	rkspi_wait_till_not_busy(spi);
-	return spi->rx == spi->rx_end;
+	if (priv->speed_hz != priv->last_speed_hz)
+		rkspi_set_clk(priv, priv->speed_hz);
+
+	/* Operation Mode */
+	ctrlr0 = OMOD_MASTER << OMOD_SHIFT;
+
+	/* Data Frame Size */
+	ctrlr0 |= spi_dfs << DFS_SHIFT;
+
+	/* set SPI mode 0..3 */
+	if (priv->mode & SPI_CPOL)
+		ctrlr0 |= SCOL_HIGH << SCOL_SHIFT;
+	if (priv->mode & SPI_CPHA)
+		ctrlr0 |= SCPH_TOGSTA << SCPH_SHIFT;
+
+	/* Chip Select Mode */
+	ctrlr0 |= CSM_KEEP << CSM_SHIFT;
+
+	/* SSN to Sclk_out delay */
+	ctrlr0 |= SSN_DELAY_ONE << SSN_DELAY_SHIFT;
+
+	/* Serial Endian Mode */
+	ctrlr0 |= SEM_LITTLE << SEM_SHIFT;
+
+	/* First Bit Mode */
+	ctrlr0 |= FBM_MSB << FBM_SHIFT;
+
+	/* Byte and Halfword Transform */
+	ctrlr0 |= spi_tf << HALF_WORD_TX_SHIFT;
+
+	/* Rxd Sample Delay */
+	ctrlr0 |= 0 << RXDSD_SHIFT;
+
+	/* Frame Format */
+	ctrlr0 |= FRF_SPI << FRF_SHIFT;
+
+	/* Tx and Rx mode */
+	ctrlr0 |= (priv->tmode & TMOD_MASK) << TMOD_SHIFT;
+
+	writel(ctrlr0, &regs->ctrlr0);
+
+	return 0;
 }
 
-static void rkspi_set_speed(struct rk_spi_slave *spi, uint speed)
+static int rockchip_spi_release_bus(struct udevice *dev)
 {
-	u16 clk_div = 0;
+	struct udevice *bus = dev->parent;
+	struct rockchip_spi_priv *priv = dev_get_priv(bus);
 
-	if (spi->speed_hz != speed) {
-		/* clk_div doesn't support odd number */
-		clk_div = (768*1000*1000 / 2 / 4) / speed;
-		clk_div = (clk_div + 1) & 0xfffe;
+	rkspi_enable_chip(priv->regs, false);
 
-		rkspi_set_clk(spi, clk_div);
-
-		spi->speed_hz = speed;
-	}
+	return 0;
 }
 
-
-static inline void rkspi_io_config(struct rk_spi_slave *spi, unsigned int len, const void *dout, void *din)
+static int rockchip_spi_xfer(struct udevice *dev, unsigned int bitlen,
+			   const void *dout, void *din, unsigned long flags)
 {
-	if (spi->n_bytes == 1) {
-		spi->read = rkspi_u8_reader;
-		spi->write = rkspi_u8_writer;
-	} else if (spi->n_bytes == 2) {
-		spi->read = rkspi_u16_reader;
-		spi->write = rkspi_u16_writer;
-	} else {
-		spi->read = rkspi_null_reader;
-		spi->write = rkspi_null_writer;
-	}
+	struct udevice *bus = dev->parent;
+	struct rockchip_spi_priv *priv = dev_get_priv(bus);
+	struct rockchip_spi *regs = priv->regs;
+	struct dm_spi_slave_platdata *slave_plat = dev_get_parent_platdata(dev);
+	int len = bitlen >> 3;
+	const u8 *out = dout;
+	u8 *in = din;
+	int toread, towrite;
+	int ret;
 
-	if (spi->tx == NULL && spi->rx == NULL) {
-		spi->read = rkspi_null_reader;
-		spi->write = rkspi_null_writer;
-	} else if (spi->tx == NULL) {
-		spi->write = rkspi_null_writer;
-	} else if (spi->rx == NULL) {
-		spi->read = rkspi_null_reader;
-	}
-
-	rkspi_writew(spi, SPI_CTRLR1, len-1);
-}
-
-
-static int rkspi_xfer_pio(struct rk_spi_slave *spi, unsigned int len,
-			const void *dout, void *din, unsigned long flags)
-{
-	spi->tx = (void *)dout;
-	spi->tx_end = spi->tx + len;
-	spi->rx = (void *)din;
-	spi->rx_end = spi->rx + len;
-
-	rkspi_io_config(spi, len, dout, din);
-
-	rkspi_enable_chip(spi, 1);
+	debug("%s: dout=%p, din=%p, len=%x, flags=%lx\n", __func__, dout, din,
+	      len, flags);
+	if (DEBUG_RK_SPI)
+		rkspi_dump_regs(regs);
 
 	/* Assert CS before transfer */
-	if (flags & SPI_XFER_BEGIN) {
-		spi_cs_activate(&spi->slave);
-	}
+	if (flags & SPI_XFER_BEGIN)
+		spi_cs_activate(dev, slave_plat->cs);
 
-	while (spi->write(spi)) {
-		rkspi_wait_till_not_busy(spi);
-		spi->read(spi);
+	while (len > 0) {
+		int todo = min(len, 0xffff);
+
+		rkspi_enable_chip(regs, false);
+		writel(todo - 1, &regs->ctrlr1);
+		rkspi_enable_chip(regs, true);
+
+		toread = todo;
+		towrite = todo;
+		while (toread || towrite) {
+			u32 status = readl(&regs->sr);
+
+			if (towrite && !(status & SR_TF_FULL)) {
+				writel(out ? *out++ : 0, regs->txdr);
+				towrite--;
+			}
+			if (toread && !(status & SR_RF_EMPT)) {
+				u32 byte = readl(regs->rxdr);
+
+				if (in)
+					*in++ = byte;
+				toread--;
+			}
+		}
+		ret = rkspi_wait_till_not_busy(regs);
+		if (ret)
+			break;
+		len -= todo;
 	}
 
 	/* Deassert CS after transfer */
-	if (flags & SPI_XFER_END) {
-		spi_cs_deactivate(&spi->slave);
-	}
+	if (flags & SPI_XFER_END)
+		spi_cs_deactivate(dev, slave_plat->cs);
 
-	rkspi_enable_chip(spi, 0);
-
-	return 0;
-}
-
-
-void spi_init(void)
-{
-
-}
-
-
-int spi_cs_is_valid(unsigned int bus, unsigned int cs)
-{
-	if ((bus >= RK_SPI_BUS_MAX) || (cs >= RK_SPI_CS_MAX))
-		return 0;
-
-	return 1;
-}
-
-void spi_cs_activate(struct spi_slave *slave)
-{
-	struct rk_spi_slave *spi = to_rk_spi(slave);
-
-	if (spi->cs_ctrl != NULL) {
-	    spi->cs_ctrl(spi, slave->cs, RK_SPI_CS_ASSERT);
-	} else {
-		rkspi_writel(spi, SPI_SER, 1 << slave->cs);
-	}
-}
-
-void spi_cs_deactivate(struct spi_slave *slave)
-{
-	struct rk_spi_slave *spi = to_rk_spi(slave);
-
-	if (spi->cs_ctrl != NULL) {
-	    spi->cs_ctrl(spi, slave->cs, RK_SPI_CS_DEASSERT);
-	} else {
-		rkspi_writel(spi, SPI_SER, 0 << slave->cs);
-	}
-}
-
-void spi_set_speed(struct spi_slave *slave, uint hz)
-{
-	struct rk_spi_slave *spi = to_rk_spi(slave);
-
-	rkspi_set_speed(spi, hz);
-}
-
-struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
-				  unsigned int max_hz, unsigned int mode)
-{
-	struct rk_spi_slave	*spi;
-	void __iomem *regs;
-
-	switch (bus) {
-	case 0:
-		regs = (void __iomem *)RKIO_SPI0_BASE;
-		break;
-	case 1:
-		regs = (void __iomem *)RKIO_SPI1_BASE;
-		break;
-	case 2:
-		regs = (void __iomem *)RKIO_SPI2_BASE;
-		break;
-	default:
-		printf("SPI error: unsupported bus %i. \
-			Supported busses 0 - 1\n", bus);
-		return NULL;
-	}
-
-	if (cs >= RK_SPI_CS_MAX) {
-		printf("SPI error: unsupported chip select %i \
-			on bus %i\n", cs, bus);
-		return NULL;
-	}
-
-	if (max_hz > RK_SPI_MAX_FREQ) {
-		printf("SPI error: unsupported frequency %i Hz. \
-			Max frequency is 48 Mhz\n", max_hz);
-		return NULL;
-	}
-
-	if (mode > SPI_MODE_3) {
-		printf("SPI error: unsupported SPI mode %i\n", mode);
-		return NULL;
-	}
-
-	spi = spi_alloc_slave(struct rk_spi_slave, bus, cs);
-	if (!spi) {
-		printf("SPI error: malloc of SPI structure failed\n");
-		return NULL;
-	}
-
-	rkspi_iomux_init(bus, cs);
-
-	spi->mode = mode; /* spi mode 0...3 */
-	spi->regs = regs;
-	spi->bits_per_word = 8;
-	spi->tmode = SPI_TMOD_TR; /* Tx & Rx */
-	spi->speed_hz = max_hz;
-
-	spi->cs_ctrl = NULL;
-	spi->read = rkspi_null_reader;
-	spi->write = rkspi_null_writer;
-
-	return &spi->slave;
-}
-
-void spi_free_slave(struct spi_slave *slave)
-{
-	struct rk_spi_slave *spi = to_rk_spi(slave);
-
-	free(spi);
-}
-
-int spi_claim_bus(struct spi_slave *slave)
-{
-	struct rk_spi_slave *spi = to_rk_spi(slave);
-	u32 ctrlr0 = 0;
-	u16 clk_div = 0;	
-	u8 spi_dfs = 0, spi_tf = 0;
-
-	/* Disable the SPI hardware */
-	rkspi_enable_chip(spi, 0);
-
-	switch (spi->bits_per_word) {
-		case 8:
-			spi->n_bytes = 1;
-			spi_dfs = SPI_DFS_8BIT;
-			spi_tf = SPI_HALF_WORLD_OFF;
-			break;
-		case 16:
-			spi->n_bytes = 2;
-			spi_dfs = SPI_DFS_16BIT;
-			spi_tf = SPI_HALF_WORLD_ON;
-			break;
-		default:
-			printf("MRST SPI: unsupported bits: %dbits\n", spi->bits_per_word);
-	}
-
-	/* Calculate clock divisor.  */
-	clk_div = (768*1000*1000 / 2 / 4) / spi->speed_hz;
-	clk_div = (clk_div + 1) & 0xfffe;
-	rkspi_set_clk(spi, clk_div);
-
-	/* Operation Mode */
-	ctrlr0 = (SPI_OMOD_MASTER << SPI_OMOD_OFFSET);
-
-	/* Data Frame Size */
-	ctrlr0 |= (spi_dfs & SPI_DFS_MASK) << SPI_DFS_OFFSET;
-
-	/* set SPI mode 0..3 */
-	if (spi->mode & SPI_CPOL)
-		ctrlr0 = (SPI_SCOL_HIGH << SPI_SCOL_OFFSET);
-	if (spi->mode & SPI_CPHA)
-		ctrlr0 = (SPI_SCPH_TOGSTA << SPI_SCPH_OFFSET);
-
-	/* Chip Select Mode */
-	ctrlr0 |= (SPI_CSM_KEEP << SPI_CSM_OFFSET);
-
-	/* SSN to Sclk_out delay */
-	ctrlr0 |= (SPI_SSN_DELAY_ONE << SPI_SSN_DELAY_OFFSET);
-
-	/* Serial Endian Mode */
-	ctrlr0 |= (SPI_SEM_LITTLE << SPI_SEM_OFFSET);
-
-	/* First Bit Mode */
-	ctrlr0 |= (SPI_FBM_MSB << SPI_FBM_OFFSET);
-
-	/* Byte and Halfword Transform */
-	ctrlr0 |= ((spi_tf & SPI_HALF_WORLD_MASK) << SPI_HALF_WORLD_TX_OFFSET);
-
-	/* Rxd Sample Delay */
-	ctrlr0 |= (0 << SPI_RXDSD_OFFSET);
-
-	/* Frame Format */
-	ctrlr0 |= (SPI_FRF_SPI << SPI_FRF_OFFSET);
-
-	/* Tx and Rx mode */
-	ctrlr0 |= (spi->tmode & SPI_TMOD_MASK) << SPI_TMOD_OFFSET;
-
-	rkspi_writel(spi, SPI_CTRLR0, ctrlr0);
-
-	return 0;
-}
-
-void spi_release_bus(struct spi_slave *slave)
-{
-	return;
-}
-
-
-int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
-		const void *dout, void *din, unsigned long flags)
-{
-	struct rk_spi_slave *spi = to_rk_spi(slave);
-	unsigned int len;
-	int ret;
-
-	len = bitlen >> 3;
-
-	debug("spi_xfer: slave %u:%u dout %08X din %08X bitlen %u\n",
-	      slave->bus, slave->cs, *(uint *) dout, *(uint *) din, bitlen);
-
-	ret = rkspi_xfer_pio(spi, len, dout, din, flags);
+	rkspi_enable_chip(regs, false);
 
 	return ret;
 }
 
+static int rockchip_spi_set_speed(struct udevice *bus, uint speed)
+{
+	struct rockchip_spi_priv *priv = dev_get_priv(bus);
+
+	/* Clamp to the maximum frequency specified in the DTS */
+	if (speed > priv->max_freq)
+		speed = priv->max_freq;
+
+	priv->speed_hz = speed;
+
+	return 0;
+}
+
+static int rockchip_spi_set_mode(struct udevice *bus, uint mode)
+{
+	struct rockchip_spi_priv *priv = dev_get_priv(bus);
+
+	priv->mode = mode;
+
+	return 0;
+}
+
+static const struct dm_spi_ops rockchip_spi_ops = {
+	.claim_bus	= rockchip_spi_claim_bus,
+	.release_bus	= rockchip_spi_release_bus,
+	.xfer		= rockchip_spi_xfer,
+	.set_speed	= rockchip_spi_set_speed,
+	.set_mode	= rockchip_spi_set_mode,
+	/*
+	 * cs_info is not needed, since we require all chip selects to be
+	 * in the device tree explicitly
+	 */
+};
+
+static const struct udevice_id rockchip_spi_ids[] = {
+	{ .compatible = "rockchip,rk3288-spi" },
+	{ .compatible = "rockchip,rk3368-spi" },
+	{ .compatible = "rockchip,rk3399-spi" },
+	{ .compatible = "rockchip,rk3066-spi" },
+	{ .compatible = "rockchip,rk3328-spi" },
+	{ }
+};
+
+U_BOOT_DRIVER(rockchip_spi) = {
+#if CONFIG_IS_ENABLED(OF_PLATDATA)
+	.name	= "rockchip_rk3288_spi",
+#else
+	.name	= "rockchip_spi",
+#endif
+	.id	= UCLASS_SPI,
+	.of_match = rockchip_spi_ids,
+	.ops	= &rockchip_spi_ops,
+	.ofdata_to_platdata = rockchip_spi_ofdata_to_platdata,
+	.platdata_auto_alloc_size = sizeof(struct rockchip_spi_platdata),
+	.priv_auto_alloc_size = sizeof(struct rockchip_spi_priv),
+	.probe	= rockchip_spi_probe,
+};

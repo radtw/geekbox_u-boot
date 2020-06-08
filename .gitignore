@@ -21,20 +21,19 @@
 *.patch
 *.cfgtmp
 *.img
-*.cmd
-*.dts.tmp
 
 # host programs on Cygwin
 *.exe
 
 # Build tree
 /build-*
-
+/rockdev
 #
 # Top-level generic files
 #
+fit-dtb.blob
 /MLO*
-/SPL
+/SPL*
 /System.map
 /u-boot*
 /boards.cfg
@@ -51,6 +50,7 @@
 /LOG
 /spl/
 /tpl/
+/defconfig
 
 #
 # Generated include files

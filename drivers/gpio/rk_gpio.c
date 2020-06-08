@@ -1,528 +1,140 @@
 /*
- * (C) Copyright 2008-2016 Fuzhou Rockchip Electronics Co., Ltd
+ * (C) Copyright 2015 Google, Inc
+ *
+ * (C) Copyright 2008-2014 Rockchip Electronics
  * Peter, Software Engineering, <superpeter.cai@gmail.com>.
  *
- * SPDX-License-Identifier:	GPL-2.0+
+ * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
+#include <dm.h>
+#include <syscon.h>
+#include <linux/errno.h>
+#include <asm/gpio.h>
 #include <asm/io.h>
+#include <asm/arch/clock.h>
+#include <dm/pinctrl.h>
+#include <dt-bindings/clock/rk3288-cru.h>
 
-#define RK_GPIO_DRIVER_MODULE /* define for gpio.h */
+enum {
+	ROCKCHIP_GPIOS_PER_BANK		= 32,
+};
 
-#include <asm/arch/rkplat.h>
+#define OFFSET_TO_BIT(bit)	(1UL << (bit))
 
-#define RKGPIO_VERSION		"1.3"
+struct rockchip_gpio_priv {
+	struct rockchip_gpio_regs *regs;
+	struct udevice *pinctrl;
+	int bank;
+	char name[2];
+};
 
-
-struct rk_gpio_bank *rk_gpio_id_to_bank(unsigned int id)
+static int rockchip_gpio_direction_input(struct udevice *dev, unsigned offset)
 {
-	int index;
+	struct rockchip_gpio_priv *priv = dev_get_priv(dev);
+	struct rockchip_gpio_regs *regs = priv->regs;
 
-	for(index = 0; index < ARRAY_SIZE(rk_gpio_banks); index++) {
-		if (rk_gpio_banks[index].id == id) {
-			return &(rk_gpio_banks[index]);
-		}
-	}
-
-	debug("rk_gpio_id_to_bank error id = %d!\n", id);
-	return NULL;
-}
-
-
-struct rk_gpio_bank *rk_gpio_get_bank(unsigned gpio)
-{
-	int id;
-
-	if (!gpio_is_valid(gpio)) {
-		return NULL;
-	}
-
-	id = (gpio & RK_GPIO_BANK_MASK) >> RK_GPIO_BANK_OFFSET;
-	return rk_gpio_id_to_bank(id);
-}
-
-
-static int rk_gpio_base_to_id(unsigned long base)
-{
-	int index;
-
-	for(index = 0; index < ARRAY_SIZE(rk_gpio_banks); index++) {
-		if (rk_gpio_banks[index].regbase == (void __iomem *)base)
-			return index;
-	}
-
-	debug("rk_gpio_base_to_id error base = 0x%lx!\n", base);
-	return -1;
-}
-
-
-int rk_gpio_base_to_bank(unsigned base)
-{
-	int bank = rk_gpio_base_to_id(base);
-
-	if (bank == -1) {
-		return -1;
-	}
-
-	return (bank << RK_GPIO_BANK_OFFSET);
-}
-
-
-#if defined(CONFIG_USE_IRQ) || defined(CONFIG_ARM64)
-int rk_gpio_gpio_to_irq(unsigned gpio)
-{
-	int bank = 0, pin = 0;
-	int index;
-
-	if (!gpio_is_valid(gpio)) {
-		return -1;
-	}
-
-	bank = (gpio & RK_GPIO_BANK_MASK) >> RK_GPIO_BANK_OFFSET;
-	pin = (gpio & RK_GPIO_PIN_MASK) >> RK_GPIO_PIN_OFFSET;
-
-	for(index = 0; index < ARRAY_SIZE(rk_gpio_banks); index++) {
-		if (rk_gpio_banks[index].id == bank)
-			return (rk_gpio_banks[index].irq_base + pin);
-	}
-
-	debug("rk_gpio_gpio_to_irq error: gpio = %d\n", gpio);
-	return -1;
-}
-
-
-int rk_gpio_irq_to_gpio(unsigned irq)
-{
-	int bank, pin;
-	int index;
-
-	bank = (irq - PIN_BASE) / NUM_GROUP;
-	pin = (irq - PIN_BASE) % NUM_GROUP;
-
-	for(index = 0; index < ARRAY_SIZE(rk_gpio_banks); index++) {
-		if (rk_gpio_banks[index].id == bank) {
-			return (bank << RK_GPIO_BANK_OFFSET) | (pin << RK_GPIO_PIN_OFFSET);
-		}
-	}
-
-	debug("rk_gpio_irq_to_gpio error: irq = %d\n", irq);
-	return -1;
-}
-#endif
-
-
-static inline void rk_gpio_set_pin_level(void __iomem *regbase, unsigned int bit, eGPIOPinLevel_t level)
-{
-	rk_gpio_bit_op(regbase, GPIO_SWPORT_DR, bit, level);
-}
-
-
-static inline int rk_gpio_get_pin_level(void __iomem *regbase, unsigned int bit)
-{
-	return ((__raw_readl(regbase + GPIO_EXT_PORT) & bit) != 0);
-}
-
-
-static inline void rk_gpio_set_pin_direction(void __iomem *regbase, unsigned int bit, eGPIOPinDirection_t direction)
-{
-	rk_gpio_bit_op(regbase, GPIO_SWPORT_DDR, bit, direction);
-}
-
-
-
-/* Common GPIO API */
-
-int gpio_request(unsigned gpio, const char *label)
-{
-	return 0;
-}
-
-
-int gpio_free(unsigned gpio)
-{
-	return 0;
-}
-
-
-/**
- * Set gpio direction as input
- */
-int gpio_direction_input(unsigned gpio)
-{
-	struct rk_gpio_bank *bank = rk_gpio_get_bank(gpio);
-
-	if (bank == NULL)
-		return -1;
-
-	gpio = (gpio & RK_GPIO_PIN_MASK) >> RK_GPIO_PIN_OFFSET;
-	if (gpio >= bank->ngpio)
-		return -1;
-
-	rk_gpio_set_pin_direction(bank->regbase, offset_to_bit(gpio), GPIO_IN);
+	clrbits_le32(&regs->swport_ddr, OFFSET_TO_BIT(offset));
 
 	return 0;
 }
 
-
-/**
- * Set gpio direction as output
- */
-int gpio_direction_output(unsigned gpio, int value)
+static int rockchip_gpio_direction_output(struct udevice *dev, unsigned offset,
+					  int value)
 {
-	struct rk_gpio_bank *bank = rk_gpio_get_bank(gpio);
+	struct rockchip_gpio_priv *priv = dev_get_priv(dev);
+	struct rockchip_gpio_regs *regs = priv->regs;
+	int mask = OFFSET_TO_BIT(offset);
 
-	if (bank == NULL)
-		return -1;
-
-	gpio = (gpio & RK_GPIO_PIN_MASK) >> RK_GPIO_PIN_OFFSET;
-	if (gpio >= bank->ngpio)
-		return -1;
-
-	rk_gpio_set_pin_level(bank->regbase, offset_to_bit(gpio), value);
-	rk_gpio_set_pin_direction(bank->regbase, offset_to_bit(gpio), GPIO_OUT);
+	clrsetbits_le32(&regs->swport_dr, mask, value ? mask : 0);
+	setbits_le32(&regs->swport_ddr, mask);
 
 	return 0;
 }
 
-
-/**
- * Get value of the specified gpio
- */
-int gpio_get_value(unsigned gpio)
+static int rockchip_gpio_get_value(struct udevice *dev, unsigned offset)
 {
-	struct rk_gpio_bank *bank = rk_gpio_get_bank(gpio);
+	struct rockchip_gpio_priv *priv = dev_get_priv(dev);
+	struct rockchip_gpio_regs *regs = priv->regs;
 
-	if (bank == NULL) {
-		return -1;
-	}
-
-	gpio = (gpio & RK_GPIO_PIN_MASK) >> RK_GPIO_PIN_OFFSET;
-	if (gpio >= bank->ngpio) {
-		return -1;
-	}
-
-	return rk_gpio_get_pin_level(bank->regbase, offset_to_bit(gpio));
+	return readl(&regs->ext_port) & OFFSET_TO_BIT(offset) ? 1 : 0;
 }
 
-
-/**
- * Set value of the specified gpio
- */
-int gpio_set_value(unsigned gpio, int value)
+static int rockchip_gpio_set_value(struct udevice *dev, unsigned offset,
+				   int value)
 {
-	struct rk_gpio_bank *bank = rk_gpio_get_bank(gpio);
+	struct rockchip_gpio_priv *priv = dev_get_priv(dev);
+	struct rockchip_gpio_regs *regs = priv->regs;
+	int mask = OFFSET_TO_BIT(offset);
 
-	if (bank == NULL) {
-		return -1;
-	}
+	clrsetbits_le32(&regs->swport_dr, mask, value ? mask : 0);
 
-	gpio = (gpio & RK_GPIO_PIN_MASK) >> RK_GPIO_PIN_OFFSET;
-	if (gpio >= bank->ngpio) {
-		return -1;
-	}
-
-	rk_gpio_set_pin_level(bank->regbase, offset_to_bit(gpio), value);
 	return 0;
 }
 
-
-#ifdef CONFIG_RK_GPIO_EXT_FUNC
-/**
- * Set gpio pull up or down mode
- */
-int gpio_pull_updown(unsigned gpio, enum GPIOPullType type)
+static int rockchip_gpio_get_function(struct udevice *dev, unsigned offset)
 {
-	struct rk_gpio_bank *bank = rk_gpio_get_bank(gpio);
-	void __iomem *base;
-	u32 val;
-
-	if (bank == NULL) {
-		return -1;
-	}
-
-	gpio = (gpio & RK_GPIO_PIN_MASK) >> RK_GPIO_PIN_OFFSET;
-	if (gpio >= bank->ngpio) {
-		return -1;
-	}
-
-#if defined(CONFIG_RKCHIP_RK3188)
-	/*
-	 * pull setting
-	 * 2'b00: Z(Noraml operaton)
-	 * 2'b01: weak 1(pull-up)
-	 * 2'b10: weak 0(pull-down)
-	 * 2'b11: Repeater(Bus keeper)
-	 */
-	switch (type) {
-		case PullDisable:
-			val = 0;
-			break;
-		case GPIOPullUp:
-			val = 1;
-			break;
-		case GPIOPullDown:
-			val = 2;
-			break;
-		default:
-			return -EINVAL;
-	}
-
-	if (bank->id == 0 && gpio < 12) {
-		base = (void __iomem *)(RKIO_PMU_PHYS + PMU_GPIO0A_PULL + ((gpio / 8) * 4));
-		gpio = (gpio % 8) * 2;
-		__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-	} else {
-		base = (void __iomem *)(RKIO_GRF_PHYS + GRF_GPIO0B_PULL - 4 + bank->id * 16 + ((gpio / 8) * 4));
-		gpio = (7 - (gpio % 8)) * 2;
-		__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-	}
-#elif defined(CONFIG_RKCHIP_RK3288)
-	/*
-	 * pull setting
-	 * 2'b00: Z(Noraml operaton)
-	 * 2'b01: weak 1(pull-up)
-	 * 2'b10: weak 0(pull-down)
-	 * 2'b11: Repeater(Bus keeper)
-	 */
-	switch (type) {
-		case PullDisable:
-			val = 0;
-			break;
-		case GPIOPullUp:
-			val = 1;
-			break;
-		case GPIOPullDown:
-			val = 2;
-			break;
-		default:
-			return -EINVAL;
-	}
-
-	if (bank->id == 0) { /* gpio0, pmu control */
-		if (gpio < (8+8+3)) { /* gpio0_a0-a8, gpio0_b0-b8, gpio0_c0-c2 */
-			base = (void __iomem *)(RKIO_PMU_PHYS + PMU_GPIO0A_PULL + ((gpio / 8) * 4));
-			gpio = (gpio % 8) * 2;
-			__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-		}
-	} else { /* gpio1-gpio8, grf control */
-		base = (void __iomem *)((RKIO_GRF_PHYS + (GRF_GPIO1D_P - 0xC) + (bank->id - 1) * 16) + ((gpio / 8) * 4));
-		gpio = (7 - (gpio % 8)) * 2;
-		__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-	}
-#elif defined(CONFIG_RKCHIP_RK3368) || defined(CONFIG_RKCHIP_RK3366)
-	/*
-	 * pull setting
-	 * 2'b00: Z(Noraml operaton)
-	 * 2'b01: weak 1(pull-up)
-	 * 2'b10: weak 0(pull-down)
-	 * 2'b11: Repeater(Bus keeper)
-	 */
-	switch (type) {
-		case PullDisable:
-			val = 0;
-			break;
-		case GPIOPullUp:
-			val = 1;
-			break;
-		case GPIOPullDown:
-			val = 2;
-			break;
-		default:
-			return -EINVAL;
-	}
-
-	if (bank->id == 0) { /* gpio0, pmu grf control */
-		base = (void __iomem *)(unsigned long)(RKIO_PMU_GRF_PHYS + PMU_GRF_GPIO0A_P + ((gpio / 8) * 4));
-		gpio = (7 - (gpio % 8)) * 2;
-		__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-	} else { /* gpio1-gpio3, grf control */
-		base = (void __iomem *)(unsigned long)(RKIO_GRF_PHYS + GRF_GPIO1A_P + (bank->id - 1) * 16 + ((gpio / 8) * 4));
-		gpio = (7 - (gpio % 8)) * 2;
-		__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-	}
-#elif defined(CONFIG_RKCHIP_RK322X)
-	/*
-	 * pull setting
-	 * 2'b00: Z(Noraml operaton)
-	 * 2'b01: weak 1(pull-up)
-	 * 2'b10: weak 0(pull-down)
-	 * 2'b11: Repeater(Bus keeper)
-	 */
-	switch (type) {
-	case PullDisable:
-		val = 0;
-		break;
-	case GPIOPullUp:
-		val = 1;
-		break;
-	case GPIOPullDown:
-		val = 2;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	base = (void __iomem *)(unsigned long)(RKIO_GRF_PHYS + GRF_GPIO0A_P + bank->id * 16 + ((gpio / 8) * 4));
-	gpio = (7 - (gpio % 8)) * 2;
-	__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-#elif defined(CONFIG_RKCHIP_RK3168)
-	/* rk3168 do nothing */
-
-#elif defined(CONFIG_RKCHIP_RK3066) || defined(CONFIG_RKCHIP_RK3036) \
-	|| defined(CONFIG_RKCHIP_RK3126) || defined(CONFIG_RKCHIP_RK3128)
-	/* RK30XX && RK292X */
-	/*
-	 * Values written to this register independently
-	 * control Pullup/Pulldown or not for the
-	 * corresponding data bit in GPIO.
-	 * 0: pull up/down enable, PAD type will decide
-	 * to be up or down, not related with this value
-	 * 1: pull up/down disable
-	*/
-	val = (type == PullDisable) ? 1 : 0;
-	base = (void __iomem *)(RKIO_GRF_PHYS + GRF_GPIO0L_PULL + bank->id * 8 + ((gpio / 16) * 4));
-	gpio = gpio % 16;
-	__raw_writel((1 << (16 + gpio)) | (val << gpio), base);
+#ifdef CONFIG_SPL_BUILD
+	return -ENODATA;
 #else
-	#error "PLS config platform for gpio driver."
-#endif
+	struct rockchip_gpio_priv *priv = dev_get_priv(dev);
+	struct rockchip_gpio_regs *regs = priv->regs;
+	bool is_output;
+	int ret;
 
-	return 0;
+	ret = pinctrl_get_gpio_mux(priv->pinctrl, priv->bank, offset);
+	if (ret)
+		return ret;
+
+	/* If it's not 0, then it is not a GPIO */
+	if (ret)
+		return GPIOF_FUNC;
+	is_output = readl(&regs->swport_ddr) & OFFSET_TO_BIT(offset);
+
+	return is_output ? GPIOF_OUTPUT : GPIOF_INPUT;
+#endif
 }
 
-
-/**
- * gpio drive strength slector
- */
-int gpio_drive_slector(unsigned gpio, enum GPIODriveSlector slector)
+static int rockchip_gpio_probe(struct udevice *dev)
 {
-	struct rk_gpio_bank *bank = rk_gpio_get_bank(gpio);
-	if (bank == NULL) {
-		return -1;
-	}
+	struct gpio_dev_priv *uc_priv = dev_get_uclass_priv(dev);
+	struct rockchip_gpio_priv *priv = dev_get_priv(dev);
+	char *end;
+	int ret;
 
-	gpio = (gpio & RK_GPIO_PIN_MASK) >> RK_GPIO_PIN_OFFSET;
-	if (gpio >= bank->ngpio) {
-		return -1;
-	}
+	priv->regs = dev_read_addr_ptr(dev);
+	ret = uclass_first_device_err(UCLASS_PINCTRL, &priv->pinctrl);
+	if (ret)
+		return ret;
 
-#if defined(CONFIG_RKCHIP_RK3066) || defined(CONFIG_RKCHIP_RK3168) || defined(CONFIG_RKCHIP_RK3036) \
-	|| defined(CONFIG_RKCHIP_RK3126) || defined(CONFIG_RKCHIP_RK3128)
-	/* no drive config */
-
-#elif defined(CONFIG_RKCHIP_RK3288)
-	void __iomem *base;
-	u32 val;
-
-	/*
-	 * drive slector
-	 * 2'b00: 2mA
-	 * 2'b01: 4mA
-	 * 2'b10: 8mA
-	 * 2'b11: 12mA
-	 */
-	switch (slector) {
-		case GPIODrv2mA:
-			val = 0;
-			break;
-		case GPIODrv4mA:
-			val = 1;
-			break;
-		case GPIODrv8mA:
-			val = 2;
-			break;
-		case GPIODrv12mA:
-			val = 3;
-			break;
-		default:
-			return -EINVAL;
-	}
-
-	if (bank->id == 0) { /* gpio0, pmu control */
-		if (gpio < (8+8+3)) { /* gpio0_a0-a8, gpio0_b0-b8, gpio0_c0-c2 */
-			base = (void __iomem *)(RKIO_PMU_PHYS + PMU_GPIO0A_DRV + ((gpio / 8) * 4));
-			gpio = (gpio % 8) * 2;
-			__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-		}
-	} else { /* gpio1-gpio8, grf control */
-		base = (void __iomem *)((RKIO_GRF_PHYS + (GRF_GPIO1D_E - 0xC) + (bank->id - 1) * 16) + ((gpio / 8) * 4));
-		gpio = (7 - (gpio % 8)) * 2;
-		__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-	}
-#elif defined(CONFIG_RKCHIP_RK3368) || defined(CONFIG_RKCHIP_RK3366)
-	void __iomem *base;
-	u32 val;
-
-	/*
-	 * drive slector
-	 * 2'b00: 2mA
-	 * 2'b01: 4mA
-	 * 2'b10: 8mA
-	 * 2'b11: 12mA
-	 */
-	switch (slector) {
-		case GPIODrv2mA:
-			val = 0;
-			break;
-		case GPIODrv4mA:
-			val = 1;
-			break;
-		case GPIODrv8mA:
-			val = 2;
-			break;
-		case GPIODrv12mA:
-			val = 3;
-			break;
-		default:
-			return -EINVAL;
-	}
-
-	if (bank->id == 0) { /* gpio0, pmu grf control */
-		base = (void __iomem *)(unsigned long)(RKIO_PMU_GRF_PHYS + PMU_GRF_GPIO0A_E + ((gpio / 8) * 4));
-		gpio = (7 - (gpio % 8)) * 2;
-		__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-	} else { /* gpio1-gpio3, grf control */
-		base = (void __iomem *)(unsigned long)((RKIO_GRF_PHYS + GRF_GPIO1A_E + (bank->id - 1) * 16) + ((gpio / 8) * 4));
-		gpio = (7 - (gpio % 8)) * 2;
-		__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-	}
-#elif defined(CONFIG_RKCHIP_RK322X)
-	void __iomem *base;
-	u32 val;
-
-	/*
-	 * drive slector
-	 * 2'b00: 2mA
-	 * 2'b01: 4mA
-	 * 2'b10: 8mA
-	 * 2'b11: 12mA
-	 */
-	switch (slector) {
-	case GPIODrv2mA:
-		val = 0;
-		break;
-	case GPIODrv4mA:
-		val = 1;
-		break;
-	case GPIODrv8mA:
-		val = 2;
-		break;
-	case GPIODrv12mA:
-		val = 3;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	base = (void __iomem *)(unsigned long)((RKIO_GRF_PHYS + GRF_GPIO0A_E + bank->id * 16) + ((gpio / 8) * 4));
-	gpio = (7 - (gpio % 8)) * 2;
-	__raw_writel((0x3 << (16 + gpio)) | (val << gpio), base);
-#else
-	/* check chip if support gpio drive slector */
-	#error "PLS config platform for gpio driver."
-#endif
+	uc_priv->gpio_count = ROCKCHIP_GPIOS_PER_BANK;
+	end = strrchr(dev->name, '@');
+	priv->bank = trailing_strtoln(dev->name, end);
+	priv->name[0] = 'A' + priv->bank;
+	uc_priv->bank_name = priv->name;
 
 	return 0;
 }
-#endif /* CONFIG_RK_GPIO_EXT_FUNC */
+
+static const struct dm_gpio_ops gpio_rockchip_ops = {
+	.direction_input	= rockchip_gpio_direction_input,
+	.direction_output	= rockchip_gpio_direction_output,
+	.get_value		= rockchip_gpio_get_value,
+	.set_value		= rockchip_gpio_set_value,
+	.get_function		= rockchip_gpio_get_function,
+};
+
+static const struct udevice_id rockchip_gpio_ids[] = {
+	{ .compatible = "rockchip,gpio-bank" },
+	{ }
+};
+
+U_BOOT_DRIVER(gpio_rockchip) = {
+	.name	= "gpio_rockchip",
+	.id	= UCLASS_GPIO,
+	.of_match = rockchip_gpio_ids,
+	.ops	= &gpio_rockchip_ops,
+	.priv_auto_alloc_size = sizeof(struct rockchip_gpio_priv),
+	.probe	= rockchip_gpio_probe,
+};

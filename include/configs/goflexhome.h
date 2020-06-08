@@ -16,11 +16,6 @@
 #define _CONFIG_GOFLEXHOME_H
 
 /*
- * Version number information
- */
-#define CONFIG_IDENT_STRING	"\nSeagate GoFlex Home"
-
-/*
  * High Level Configuration Options (easy to change)
  */
 #define CONFIG_FEROCEON_88FR131	1	/* CPU Core subversion */
@@ -47,21 +42,6 @@
 /*
  * Commands configuration
  */
-#define CONFIG_SYS_NO_FLASH		/* Declare no flash (NOR/SPI) */
-#define CONFIG_CONSOLE_MUX
-#define CONFIG_SYS_CONSOLE_IS_IN_ENV
-
-#include <config_cmd_default.h>
-#define CONFIG_CMD_DHCP
-#define CONFIG_CMD_ENV
-#define CONFIG_CMD_MII
-#define CONFIG_CMD_NAND
-#define CONFIG_CMD_PING
-#define CONFIG_CMD_USB
-#define CONFIG_CMD_IDE
-#define CONFIG_CMD_DATE
-#define CONFIG_CMD_EXT4
-#define CONFIG_SYS_MVFS         /* Picks up Filesystem from mv-common.h */
 
 /*
  * mv-common.h should be defined after CMD configs since it used them
@@ -69,17 +49,11 @@
  */
 #include "mv-common.h"
 
-#undef CONFIG_SYS_PROMPT	/* previously defined in mv-common.h */
-#define CONFIG_SYS_PROMPT	"GoFlexHome> "	/* Command Prompt */
-
 /*
  *  Environment variables configurations
  */
 #ifdef CONFIG_CMD_NAND
-#define CONFIG_ENV_IS_IN_NAND		1
 #define CONFIG_ENV_SECT_SIZE		0x20000	/* 128K */
-#else
-#define CONFIG_ENV_IS_NOWHERE		1	/* if env in SDRAM */
 #endif
 /*
  * max 4k env size is enough, but in case of nand

@@ -1,8 +1,5 @@
 if TARGET_AM335X_EVM
 
-config SYS_CPU
-	default "armv7"
-
 config SYS_BOARD
 	default "am335x"
 
@@ -24,5 +21,14 @@ config CONS_INDEX
 	  in documentation, etc) available to it.  Depending on your specific
 	  board you may want something other than UART0 as for example the IDK
 	  uses UART3 so enter 4 here.
+
+config NOR
+	bool "Support for NOR flash"
+	help
+	  The AM335x SoC supports having a NOR flash connected to the GPMC.
+	  In practice this is seen as a NOR flash module connected to the
+	  "memory cape" for the BeagleBone family.
+
+source "board/ti/common/Kconfig"
 
 endif

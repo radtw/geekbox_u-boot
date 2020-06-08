@@ -21,49 +21,54 @@
  */
 
 #ifndef __ASSEMBLY__
+#include <membuff.h>
 #include <linux/list.h>
+
+/* Never change the sequence of members !!! */
+struct pm_ctx {
+	unsigned long sp;
+	phys_addr_t cpu_resume_addr;
+	unsigned long suspend_regs[15];
+};
+
+struct pre_serial {
+	u32 using_pre_serial;
+	u32 id;
+	u32 baudrate;
+	ulong addr;
+};
 
 typedef struct global_data {
 	bd_t *bd;
 	unsigned long flags;
 	unsigned int baudrate;
-	unsigned long cpu_clk;	/* CPU clock in Hz!		*/
-#ifdef CONFIG_ROCKCHIP
-	unsigned long cpul_clk;	/* CPU clock in Hz!		*/
-	unsigned long fb_offset;/* Address offset of kernel logo */
-	int uboot_logo;		/* uboot logo state*/
-#endif
+	unsigned long cpu_clk;		/* CPU clock in Hz!		*/
 	unsigned long bus_clk;
 	/* We cannot bracket this with CONFIG_PCI due to mpc5xxx */
 	unsigned long pci_clk;
 	unsigned long mem_clk;
 #if defined(CONFIG_LCD) || defined(CONFIG_VIDEO)
-	unsigned long fb_base;	/* Base address of framebuffer mem */
+	unsigned long fb_base;		/* Base address of framebuffer mem */
 #endif
-#if defined(CONFIG_POST) || defined(CONFIG_LOGBUFFER)
-	unsigned long post_log_word;  /* Record POST activities */
-	unsigned long post_log_res; /* success of POST test */
-	unsigned long post_init_f_time;  /* When post_init_f started */
+#if defined(CONFIG_POST)
+	unsigned long post_log_word;	/* Record POST activities */
+	unsigned long post_log_res;	/* success of POST test */
+	unsigned long post_init_f_time;	/* When post_init_f started */
 #endif
 #ifdef CONFIG_BOARD_TYPES
 	unsigned long board_type;
 #endif
 	unsigned long have_console;	/* serial_init() was called */
-#ifdef CONFIG_PRE_CONSOLE_BUFFER
+#if CONFIG_IS_ENABLED(PRE_CONSOLE_BUFFER)
 	unsigned long precon_buf_idx;	/* Pre-Console buffer index */
 #endif
-#ifdef CONFIG_MODEM_SUPPORT
-	unsigned long do_mdm_init;
-	unsigned long be_quiet;
-#endif
-	unsigned long env_addr;	/* Address  of Environment struct */
-	unsigned long env_valid;	/* Checksum of Environment valid? */
+	unsigned long env_addr;		/* Address  of Environment struct */
+	unsigned long env_valid;	/* Environment valid? enum env_valid */
 
-	unsigned long ram_top;	/* Top address of RAM used by U-Boot */
-
+	unsigned long ram_top;		/* Top address of RAM used by U-Boot */
 	unsigned long relocaddr;	/* Start address of U-Boot in RAM */
-	phys_size_t ram_size;	/* RAM size */
-	unsigned long mon_len;	/* monitor len */
+	phys_size_t ram_size;		/* RAM size */
+	unsigned long mon_len;		/* monitor len */
 	unsigned long irq_sp;		/* irq stack pointer */
 	unsigned long start_addr_sp;	/* start_addr_stackpointer */
 	unsigned long reloc_off;
@@ -74,12 +79,25 @@ typedef struct global_data {
 	struct udevice	*dm_root_f;	/* Pre-relocation root instance */
 	struct list_head uclass_root;	/* Head of core tree */
 #endif
+#ifdef CONFIG_TIMER
+	struct udevice	*timer;		/* Timer instance for Driver Model */
+#endif
 
-	const void *fdt_blob;	/* Our device tree, NULL if none */
-	void *new_fdt;		/* Relocated FDT */
-	unsigned long fdt_size;	/* Space reserved for relocated FDT */
-	void **jt;		/* jump table */
-	char env_buf[32];	/* buffer for getenv() before reloc. */
+#ifdef CONFIG_USING_KERNEL_DTB
+	const void *fdt_blob_kern;	/* Kernel dtb at the tail of u-boot.bin */
+#endif
+	const void *fdt_blob;		/* Our device tree, NULL if none */
+
+#ifdef CONFIG_USING_KERNEL_DTB
+	const void *ufdt_blob;		/* Our U-Boot device tree, NULL if none */
+#endif
+	void *new_fdt;			/* Relocated FDT */
+	unsigned long fdt_size;		/* Space reserved for relocated FDT */
+#ifdef CONFIG_OF_LIVE
+	struct device_node *of_root;
+#endif
+	struct jt_funcs *jt;		/* jump table */
+	char env_buf[32];		/* buffer for env_get() before reloc. */
 #ifdef CONFIG_TRACE
 	void		*trace_buff;	/* The trace buffer */
 #endif
@@ -89,19 +107,58 @@ typedef struct global_data {
 #ifdef CONFIG_SYS_I2C_MXC
 	void *srdata[10];
 #endif
-	unsigned long timebase_h;
-	unsigned long timebase_l;
-#ifdef CONFIG_SYS_MALLOC_F_LEN
+	unsigned int timebase_h;
+	unsigned int timebase_l;
+#if CONFIG_VAL(SYS_MALLOC_F_LEN)
 	unsigned long malloc_base;	/* base address of early malloc() */
 	unsigned long malloc_limit;	/* limit address */
 	unsigned long malloc_ptr;	/* current address */
 #endif
+#ifdef CONFIG_PCI
+	struct pci_controller *hose;	/* PCI hose for early use */
+	phys_addr_t pci_ram_top;	/* top of region accessible to PCI */
+#endif
+#ifdef CONFIG_PCI_BOOTDELAY
+	int pcidelay_done;
+#endif
+	struct udevice *cur_serial_dev;	/* current serial device */
 	struct arch_global_data arch;	/* architecture-specific data */
+#ifdef CONFIG_CONSOLE_RECORD
+	struct membuff console_out;	/* console output */
+	struct membuff console_in;	/* console input */
+#endif
+#ifdef CONFIG_DM_VIDEO
+	ulong video_top;		/* Top of video frame buffer area */
+	ulong video_bottom;		/* Bottom of video frame buffer area */
+#endif
+#ifdef CONFIG_BOOTSTAGE
+	struct bootstage_data *bootstage;	/* Bootstage information */
+	struct bootstage_data *new_bootstage;	/* Relocated bootstage info */
+#endif
+	phys_addr_t pm_ctx_phys;
+
+#ifdef CONFIG_BOOTSTAGE_PRINTF_TIMESTAMP
+	int new_line;
+#endif
+	struct pre_serial serial;
+	ulong sys_start_tick;		/* For report system start-up time */
+	int console_evt;		/* Console event, maybe some hotkey  */
+#ifdef CONFIG_LOG
+	int log_drop_count;		/* Number of dropped log messages */
+	int default_log_level;		/* For devices with no filters */
+	struct list_head log_head;	/* List of struct log_device */
+#endif
 } gd_t;
 #endif
 
+#ifdef CONFIG_BOARD_TYPES
+#define gd_board_type()		gd->board_type
+#else
+#define gd_board_type()		0
+#endif
+
 /*
- * Global Data Flags
+ * Global Data Flags - the top 16 bits are reserved for arch-specific flags
  */
 #define GD_FLG_RELOC		0x00001	/* Code was relocated to RAM	   */
 #define GD_FLG_DEVINIT		0x00002	/* Devices have been initialized   */
@@ -112,19 +169,17 @@ typedef struct global_data {
 #define GD_FLG_DISABLE_CONSOLE	0x00040	/* Disable console (in & out)	   */
 #define GD_FLG_ENV_READY	0x00080	/* Env. imported into hash table   */
 #define GD_FLG_SERIAL_READY	0x00100	/* Pre-reloc serial console ready  */
+#define GD_FLG_FULL_MALLOC_INIT	0x00200	/* Full malloc() is ready	   */
+#define GD_FLG_SPL_INIT		0x00400	/* spl_init() has been called	   */
+#define GD_FLG_SKIP_RELOC	0x00800	/* Don't relocate		   */
+#define GD_FLG_RECORD		0x01000	/* Record console		   */
+#define GD_FLG_ENV_DEFAULT	0x02000 /* Default variable flag	   */
+#define GD_FLG_SPL_EARLY_INIT	0x04000 /* Early SPL init is done	   */
+#define GD_FLG_LOG_READY	0x08000 /* Log system is ready for use	   */
 
-
-#ifdef CONFIG_ROCKCHIP
-
-/*
- * Global Data Flags
- *
- * Note: The low 16 bits are expected for common code.  If your arch
- *       really needs to add your own, use the high 16bits.
- */
-#define GD_FLG_IRQINIT		(0x00001 << 16)	/* interrupt have been initialized   */
-
-#endif /* CONFIG_ROCKCHIP */
-
+#ifdef CONFIG_ARCH_ROCKCHIP
+/* BL32 is enabled */
+#define GD_FLG_BL32_ENABLED	0x20000
+#endif
 
 #endif /* __ASM_GENERIC_GBL_DATA_H */

@@ -30,7 +30,7 @@
  *  - this structure is relatively short-lived - only
  *    guaranteed to contain useful data in setup_arch()
  */
-#define COMMAND_LINE_SIZE 1024
+#define COMMAND_LINE_SIZE 2048
 
 /* This is the old deprecated way to pass parameters to the kernel */
 struct param_struct {
@@ -132,7 +132,7 @@ struct tag_ramdisk {
 /* describes where the compressed ramdisk image lives (virtual address) */
 /*
  * this one accidentally used virtual addresses - as such,
- * its depreciated.
+ * it's deprecated.
  */
 #define ATAG_INITRD	0x54410005
 

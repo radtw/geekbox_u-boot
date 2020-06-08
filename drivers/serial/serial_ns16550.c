@@ -119,8 +119,7 @@ static NS16550_t serial_ports[6] = {
 	.puts	= eserial##port##_puts,		\
 }
 
-void
-_serial_putc(const char c,const int port)
+static void _serial_putc(const char c, const int port)
 {
 	if (c == '\n')
 		NS16550_putc(PORT, '\r');
@@ -128,35 +127,24 @@ _serial_putc(const char c,const int port)
 	NS16550_putc(PORT, c);
 }
 
-void
-_serial_putc_raw(const char c,const int port)
-{
-	NS16550_putc(PORT, c);
-}
-
-void
-_serial_puts (const char *s,const int port)
+static void _serial_puts(const char *s, const int port)
 {
 	while (*s) {
-		_serial_putc (*s++,port);
+		_serial_putc(*s++, port);
 	}
 }
 
-
-int
-_serial_getc(const int port)
+static int _serial_getc(const int port)
 {
 	return NS16550_getc(PORT);
 }
 
-int
-_serial_tstc(const int port)
+static int _serial_tstc(const int port)
 {
 	return NS16550_tstc(PORT);
 }
 
-void
-_serial_setbrg (const int port)
+static void _serial_setbrg(const int port)
 {
 	int clock_divisor;
 
@@ -169,12 +157,6 @@ static inline void
 serial_putc_dev(unsigned int dev_index,const char c)
 {
 	_serial_putc(c,dev_index);
-}
-
-static inline void
-serial_putc_raw_dev(unsigned int dev_index,const char c)
-{
-	_serial_putc_raw(c,dev_index);
 }
 
 static inline void

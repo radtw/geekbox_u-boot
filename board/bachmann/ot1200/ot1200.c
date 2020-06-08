@@ -6,15 +6,18 @@
  */
 
 #include <common.h>
+#include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/iomux.h>
 #include <malloc.h>
 #include <asm/arch/mx6-pins.h>
-#include <asm/imx-common/iomux-v3.h>
-#include <asm/imx-common/mxc_i2c.h>
-#include <asm/imx-common/boot_mode.h>
+#include <asm/mach-imx/iomux-v3.h>
+#include <asm/mach-imx/sata.h>
+#include <asm/mach-imx/mxc_i2c.h>
+#include <asm/mach-imx/boot_mode.h>
 #include <asm/arch/crm_regs.h>
+#include <asm/arch/sys_proto.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
 #include <netdev.h>
@@ -45,7 +48,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int dram_init(void)
 {
-	gd->ram_size = get_ram_size((void *)PHYS_SDRAM, PHYS_SDRAM_SIZE);
+	gd->ram_size = imx_ddr_size();
 
 	return 0;
 }
@@ -98,10 +101,83 @@ static void setup_iomux_spi(void)
 	imx_iomux_v3_setup_multiple_pads(ecspi1_pads, ARRAY_SIZE(ecspi1_pads));
 }
 
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 2 && cs == 0) ? (IMX_GPIO_NR(1, 3)) : -1;
+}
+
+static iomux_v3_cfg_t const feature_pads[] = {
+	/* SD card detect */
+	MX6_PAD_GPIO_4__GPIO1_IO04 | MUX_PAD_CTRL(PAD_CTL_PUS_100K_DOWN),
+
+	/* eMMC soldered? */
+	MX6_PAD_GPIO_19__GPIO4_IO05 | MUX_PAD_CTRL(PAD_CTL_PUS_100K_UP),
+};
+
+static void setup_iomux_features(void)
+{
+	imx_iomux_v3_setup_multiple_pads(feature_pads,
+		ARRAY_SIZE(feature_pads));
+}
+
+#define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
+
+/* I2C2 - EEPROM */
+static struct i2c_pads_info i2c_pad_info1 = {
+	.scl = {
+		.i2c_mode = MX6_PAD_EIM_EB2__I2C2_SCL | PC,
+		.gpio_mode = MX6_PAD_EIM_EB2__GPIO2_IO30 | PC,
+		.gp = IMX_GPIO_NR(2, 30)
+	},
+	.sda = {
+		.i2c_mode = MX6_PAD_EIM_D16__I2C2_SDA | PC,
+		.gpio_mode = MX6_PAD_EIM_D16__GPIO3_IO16 | PC,
+		.gp = IMX_GPIO_NR(3, 16)
+	}
+};
+
+/* I2C3 - IO expander  */
+static struct i2c_pads_info i2c_pad_info2 = {
+	.scl = {
+		.i2c_mode = MX6_PAD_EIM_D17__I2C3_SCL | PC,
+		.gpio_mode = MX6_PAD_EIM_D17__GPIO3_IO17 | PC,
+		.gp = IMX_GPIO_NR(3, 17)
+	},
+	.sda = {
+		.i2c_mode = MX6_PAD_EIM_D18__I2C3_SDA | PC,
+		.gpio_mode = MX6_PAD_EIM_D18__GPIO3_IO18 | PC,
+		.gp = IMX_GPIO_NR(3, 18)
+	}
+};
+
+static void setup_iomux_i2c(void)
+{
+	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
+	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
+}
+
+static void ccgr_init(void)
+{
+	struct mxc_ccm_reg *ccm = (struct mxc_ccm_reg *)CCM_BASE_ADDR;
+
+	writel(0x00C03F3F, &ccm->CCGR0);
+	writel(0x0030FC33, &ccm->CCGR1);
+	writel(0x0FFFC000, &ccm->CCGR2);
+	writel(0x3FF00000, &ccm->CCGR3);
+	writel(0x00FFF300, &ccm->CCGR4);
+	writel(0x0F0000C3, &ccm->CCGR5);
+	writel(0x000003FF, &ccm->CCGR6);
+}
+
 int board_early_init_f(void)
 {
+	ccgr_init();
+	gpr_init();
+
 	setup_iomux_uart();
 	setup_iomux_spi();
+	setup_iomux_i2c();
+	setup_iomux_features();
 
 	return 0;
 }
@@ -120,44 +196,71 @@ static iomux_v3_cfg_t const usdhc3_pads[] = {
 	MX6_PAD_SD3_RST__SD3_RESET | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 };
 
+iomux_v3_cfg_t const usdhc4_pads[] = {
+	MX6_PAD_SD4_CLK__SD4_CLK | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_CMD__SD4_CMD | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT0__SD4_DATA0 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT1__SD4_DATA1 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT2__SD4_DATA2 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT3__SD4_DATA3 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+};
+
 int board_mmc_getcd(struct mmc *mmc)
 {
-	return 1;
+	struct fsl_esdhc_cfg *cfg = (struct fsl_esdhc_cfg *)mmc->priv;
+	int ret;
+
+	if (cfg->esdhc_base == USDHC3_BASE_ADDR) {
+		gpio_direction_input(IMX_GPIO_NR(4, 5));
+		ret = gpio_get_value(IMX_GPIO_NR(4, 5));
+	} else {
+		gpio_direction_input(IMX_GPIO_NR(1, 5));
+		ret = !gpio_get_value(IMX_GPIO_NR(1, 5));
+	}
+
+	return ret;
 }
 
-struct fsl_esdhc_cfg usdhc_cfg[] = {
+struct fsl_esdhc_cfg usdhc_cfg[2] = {
 	{USDHC3_BASE_ADDR},
+	{USDHC4_BASE_ADDR},
 };
 
 int board_mmc_init(bd_t *bis)
 {
+	int ret;
+	u32 index = 0;
+
 	usdhc_cfg[0].sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
+	usdhc_cfg[1].sdhc_clk = mxc_get_clock(MXC_ESDHC4_CLK);
+
 	usdhc_cfg[0].max_bus_width = 8;
+	usdhc_cfg[1].max_bus_width = 4;
 
-	imx_iomux_v3_setup_multiple_pads(usdhc3_pads, ARRAY_SIZE(usdhc3_pads));
+	for (index = 0; index < CONFIG_SYS_FSL_USDHC_NUM; ++index) {
+		switch (index) {
+		case 0:
+			imx_iomux_v3_setup_multiple_pads(
+				usdhc3_pads, ARRAY_SIZE(usdhc3_pads));
+			break;
+		case 1:
+			imx_iomux_v3_setup_multiple_pads(
+				usdhc4_pads, ARRAY_SIZE(usdhc4_pads));
+			break;
+		default:
+			printf("Warning: you configured more USDHC controllers"
+				"(%d) then supported by the board (%d)\n",
+				index + 1, CONFIG_SYS_FSL_USDHC_NUM);
+			return -EINVAL;
+		}
 
-	return fsl_esdhc_initialize(bis, &usdhc_cfg[0]);
-}
-
-#define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
-
-/* I2C3 - IO expander  */
-static struct i2c_pads_info i2c_pad_info2 = {
-	.scl = {
-		.i2c_mode = MX6_PAD_EIM_D17__I2C3_SCL | PC,
-		.gpio_mode = MX6_PAD_EIM_D17__GPIO3_IO17 | PC,
-		.gp = IMX_GPIO_NR(3, 17)
-	},
-	.sda = {
-		.i2c_mode = MX6_PAD_EIM_D18__I2C3_SDA | PC,
-		.gpio_mode = MX6_PAD_EIM_D18__GPIO3_IO18 | PC,
-		.gp = IMX_GPIO_NR(3, 18)
+		ret = fsl_esdhc_initialize(bis, &usdhc_cfg[index]);
+		if (ret)
+			return ret;
 	}
-};
 
-static iomux_v3_cfg_t const pwm_pad[] = {
-	MX6_PAD_SD1_CMD__PWM4_OUT | MUX_PAD_CTRL(OUTPUT_40OHM),
-};
+	return 0;
+}
 
 static void leds_on(void)
 {
@@ -187,29 +290,33 @@ int board_eth_init(bd_t *bis)
 
 	bus = fec_get_miibus(base, -1);
 	if (!bus)
-		return 0;
+		return -EINVAL;
 
 	/* scan phy 0 and 5 */
 	phydev = phy_find_by_mask(bus, 0x21, PHY_INTERFACE_MODE_RGMII);
 	if (!phydev) {
-		free(bus);
-		return 0;
+		ret = -EINVAL;
+		goto free_bus;
 	}
 
 	/* depending on the phy address we can detect our board version */
 	if (phydev->addr == 0)
-		setenv("boardver", "");
+		env_set("boardver", "");
 	else
-		setenv("boardver", "mr");
+		env_set("boardver", "mr");
 
 	printf("using phy at %d\n", phydev->addr);
 	ret = fec_probe(bis, -1, base, bus, phydev);
-	if (ret) {
-		printf("FEC MXC: %s:failed\n", __func__);
-		free(phydev);
-		free(bus);
-	}
+	if (ret)
+		goto free_phydev;
+
 	return 0;
+
+free_phydev:
+	free(phydev);
+free_bus:
+	free(bus);
+	return ret;
 }
 
 int board_init(void)
@@ -218,12 +325,11 @@ int board_init(void)
 
 	backlight_lcd_off();
 
-	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
-
 	leds_on();
 
-	/* enable ecspi3 clocks */
-	enable_cspi_clock(1, 2);
+#ifdef CONFIG_SATA
+	setup_sata();
+#endif
 
 	return 0;
 }

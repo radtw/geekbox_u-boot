@@ -1,7 +1,7 @@
 if TARGET_X600
 
-config SYS_CPU
-	default "arm926ejs"
+config SPL_LDSCRIPT
+	default "arch/arm/cpu/arm926ejs/spear/u-boot-spl.lds"
 
 config SYS_BOARD
 	default "x600"

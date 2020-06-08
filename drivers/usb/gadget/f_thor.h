@@ -35,7 +35,7 @@ struct usb_cdc_attribute_vendor_descriptor {
 	__u8 DAUValue;
 } __packed;
 
-#define VER_PROTOCOL_MAJOR	4
+#define VER_PROTOCOL_MAJOR	5
 #define VER_PROTOCOL_MINOR	0
 
 enum rqt {
@@ -121,4 +121,7 @@ struct f_thor {
 #define F_NAME_BUF_SIZE 32
 #define THOR_PACKET_SIZE SZ_1M      /* 1 MiB */
 #define THOR_STORE_UNIT_SIZE SZ_32M /* 32 MiB */
+#ifdef CONFIG_THOR_RESET_OFF
+#define RESET_DONE 0xFFFFFFFF
+#endif
 #endif /* _USB_THOR_H_ */

@@ -9,6 +9,9 @@
 #ifndef _UBOOT_CRC_H
 #define _UBOOT_CRC_H
 
+/* lib/crc8.c */
+unsigned int crc8(unsigned int crc_start, const unsigned char *vptr, int len);
+
 /* lib/crc32.c */
 uint32_t crc32 (uint32_t, const unsigned char *, uint);
 uint32_t crc32_wd (uint32_t, const unsigned char *, uint, uint);
@@ -25,8 +28,8 @@ uint32_t crc32_no_comp (uint32_t, const unsigned char *, uint);
 void crc32_wd_buf(const unsigned char *input, uint ilen,
 		    unsigned char *output, uint chunk_sz);
 
-#ifdef CONFIG_ROCKCHIP
-uint32_t crc32_rk (uint32_t, const unsigned char *, uint32_t);
-#endif
+/* lib/crc32c.c */
+void crc32c_init(uint32_t *, uint32_t);
+uint32_t crc32c_cal(uint32_t, const char *, int, uint32_t *);
 
 #endif /* _UBOOT_CRC_H */

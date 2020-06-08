@@ -16,7 +16,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/crm_regs.h>
-#include <asm/imx-common/iomux-v3.h>
+#include <asm/mach-imx/iomux-v3.h>
 #include <fsl_esdhc.h>
 #include "common.h"
 
@@ -107,6 +107,8 @@ static struct mx6_ddr_sysinfo cm_fx6_sysinfo_s = {
 	.mif3_mode	= 3,
 	.rst_to_cke	= 0x23,
 	.sde_to_rst	= 0x10,
+	.refsel = 1,		/* Refresh cycles at 32KHz */
+	.refr = 7,		/* 8 refresh commands per refresh cycle */
 };
 
 static struct mx6_ddr3_cfg cm_fx6_ddr3_cfg_s = {
@@ -174,6 +176,8 @@ static struct mx6_ddr_sysinfo cm_fx6_sysinfo_q = {
 	.mif3_mode	= 3,
 	.rst_to_cke	= 0x23,
 	.sde_to_rst	= 0x10,
+	.refsel = 1,		/* Refresh cycles at 32KHz */
+	.refr = 7,		/* 8 refresh commands per refresh cycle */
 };
 
 static struct mx6_ddr3_cfg cm_fx6_ddr3_cfg_q = {
@@ -235,10 +239,11 @@ static int cm_fx6_spl_dram_init(void)
 
 		spl_mx6s_dram_init(DDR_32BIT_1GB, false);
 		bank1_size = get_ram_size((long int *)PHYS_SDRAM_1, 0x80000000);
-		if (bank1_size == 0x40000000)
-			return 0;
-
+		bank2_size = get_ram_size((long int *)PHYS_SDRAM_2, 0x80000000);
 		if (bank1_size == 0x20000000) {
+			if (bank2_size == 0x20000000)
+				return 0;
+
 			spl_mx6s_dram_init(DDR_32BIT_512MB, true);
 			return 0;
 		}
@@ -302,7 +307,7 @@ static void cm_fx6_setup_uart(void)
 static void cm_fx6_setup_ecspi(void)
 {
 	cm_fx6_set_ecspi_iomux();
-	enable_cspi_clock(1, 0);
+	enable_spi_clk(1, 0);
 }
 #else
 static void cm_fx6_setup_ecspi(void) { }
@@ -312,7 +317,6 @@ void board_init_f(ulong dummy)
 {
 	struct mxc_ccm_reg *mxc_ccm = (struct mxc_ccm_reg *)CCM_BASE_ADDR;
 
-	gd = &gdata;
 	/*
 	 * We don't use DMA in SPL, but we do need it in U-Boot. U-Boot
 	 * initializes DMA very early (before all board code), so the only
@@ -337,16 +341,17 @@ void board_init_f(ulong dummy)
 	board_init_r(NULL, 0);
 }
 
-void spl_board_init(void)
+void board_boot_order(u32 *spl_boot_list)
 {
-	u32 boot_device = spl_boot_device();
-
-	if (boot_device == BOOT_DEVICE_SPI)
-		puts("Booting from SPI flash\n");
-	else if (boot_device == BOOT_DEVICE_MMC1)
-		puts("Booting from MMC\n");
-	else
-		puts("Unknown boot device\n");
+	spl_boot_list[0] = spl_boot_device();
+	switch (spl_boot_list[0]) {
+	case BOOT_DEVICE_SPI:
+		spl_boot_list[1] = BOOT_DEVICE_MMC1;
+		break;
+	case BOOT_DEVICE_MMC1:
+		spl_boot_list[1] = BOOT_DEVICE_SPI;
+		break;
+	}
 }
 
 #ifdef CONFIG_SPL_MMC_SUPPORT

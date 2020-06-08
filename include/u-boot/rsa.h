@@ -30,6 +30,8 @@ struct rsa_public_key {
 	uint64_t exponent;	/* public exponent */
 };
 
+struct image_sign_info;
+
 #if IMAGE_ENABLE_SIGN
 /**
  * sign() - calculate and return signature for given input data
@@ -80,7 +82,7 @@ static inline int rsa_add_verify_data(struct image_sign_info *info,
 }
 #endif
 
-#if IMAGE_ENABLE_VERIFY
+#if IMAGE_ENABLE_VERIFY || defined(CONFIG_SPL_FIT_SIGNATURE)
 /**
  * rsa_verify() - Verify a signature against some data
  *

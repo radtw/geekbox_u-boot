@@ -1,204 +1,139 @@
 /*
- * Copyright (C) 2012-2014 Panasonic Corporation
- *   Author: Masahiro Yamada <yamada.m@jp.panasonic.com>
- *
- * Based on serial_ns16550.c
- * (C) Copyright 2000
- * Rob Taylor, Flying Pig Systems. robt@flyingpig.com.
+ * Copyright (C) 2012-2015 Panasonic Corporation
+ * Copyright (C) 2015-2016 Socionext Inc.
+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <dm.h>
+#include <linux/io.h>
+#include <linux/serial_reg.h>
+#include <linux/sizes.h>
+#include <linux/errno.h>
 #include <serial.h>
-
-#define UART_REG(x)					\
-	u8 x;						\
-	u8 postpad_##x[3];
+#include <fdtdec.h>
 
 /*
  * Note: Register map is slightly different from that of 16550.
  */
 struct uniphier_serial {
-	UART_REG(rbr);		/* 0x00 */
-	UART_REG(ier);		/* 0x04 */
-	UART_REG(iir);		/* 0x08 */
-	UART_REG(fcr);		/* 0x0c */
-	u8 mcr;			/* 0x10 */
-	u8 lcr;
-	u16 __postpad;
-	UART_REG(lsr);		/* 0x14 */
-	UART_REG(msr);		/* 0x18 */
-	u32 __none1;
-	u32 __none2;
-	u16 dlr;
-	u16 __postpad2;
+	u32 rx;			/* In:  Receive buffer */
+#define tx rx			/* Out: Transmit buffer */
+	u32 ier;		/* Interrupt Enable Register */
+	u32 iir;		/* In: Interrupt ID Register */
+	u32 char_fcr;		/* Charactor / FIFO Control Register */
+	u32 lcr_mcr;		/* Line/Modem Control Register */
+#define LCR_SHIFT	8
+#define LCR_MASK	(0xff << (LCR_SHIFT))
+	u32 lsr;		/* In: Line Status Register */
+	u32 msr;		/* In: Modem Status Register */
+	u32 __rsv0;
+	u32 __rsv1;
+	u32 dlr;		/* Divisor Latch Register */
 };
 
-#define thr rbr
+struct uniphier_serial_private_data {
+	struct uniphier_serial __iomem *membase;
+	unsigned int uartclk;
+};
 
-/*
- * These are the definitions for the Line Control Register
- */
-#define UART_LCR_WLS_8	0x03		/* 8 bit character length */
+#define uniphier_serial_port(dev)	\
+	((struct uniphier_serial_private_data *)dev_get_priv(dev))->membase
 
-/*
- * These are the definitions for the Line Status Register
- */
-#define UART_LSR_DR	0x01		/* Data ready */
-#define UART_LSR_THRE	0x20		/* Xmit holding register empty */
-
-DECLARE_GLOBAL_DATA_PTR;
-
-static void uniphier_serial_init(struct uniphier_serial *port)
+static int uniphier_serial_setbrg(struct udevice *dev, int baudrate)
 {
+	struct uniphier_serial_private_data *priv = dev_get_priv(dev);
+	struct uniphier_serial __iomem *port = uniphier_serial_port(dev);
 	const unsigned int mode_x_div = 16;
 	unsigned int divisor;
 
-	writeb(UART_LCR_WLS_8, &port->lcr);
+	divisor = DIV_ROUND_CLOSEST(priv->uartclk, mode_x_div * baudrate);
 
-	divisor = DIV_ROUND_CLOSEST(CONFIG_SYS_UNIPHIER_UART_CLK,
-						mode_x_div * gd->baudrate);
+	writel(divisor, &port->dlr);
 
-	writew(divisor, &port->dlr);
+	return 0;
 }
 
-static void uniphier_serial_setbrg(struct uniphier_serial *port)
+static int uniphier_serial_getc(struct udevice *dev)
 {
-	uniphier_serial_init(port);
+	struct uniphier_serial __iomem *port = uniphier_serial_port(dev);
+
+	if (!(readl(&port->lsr) & UART_LSR_DR))
+		return -EAGAIN;
+
+	return readl(&port->rx);
 }
 
-static int uniphier_serial_tstc(struct uniphier_serial *port)
+static int uniphier_serial_putc(struct udevice *dev, const char c)
 {
-	return (readb(&port->lsr) & UART_LSR_DR) != 0;
+	struct uniphier_serial __iomem *port = uniphier_serial_port(dev);
+
+	if (!(readl(&port->lsr) & UART_LSR_THRE))
+		return -EAGAIN;
+
+	writel(c, &port->tx);
+
+	return 0;
 }
 
-static int uniphier_serial_getc(struct uniphier_serial *port)
+static int uniphier_serial_pending(struct udevice *dev, bool input)
 {
-	while (!uniphier_serial_tstc(port))
-		;
+	struct uniphier_serial __iomem *port = uniphier_serial_port(dev);
 
-	return readb(&port->rbr);
+	if (input)
+		return readl(&port->lsr) & UART_LSR_DR;
+	else
+		return !(readl(&port->lsr) & UART_LSR_THRE);
 }
 
-static void uniphier_serial_putc(struct uniphier_serial *port, const char c)
+static int uniphier_serial_probe(struct udevice *dev)
 {
-	if (c == '\n')
-		uniphier_serial_putc(port, '\r');
+	DECLARE_GLOBAL_DATA_PTR;
+	struct uniphier_serial_private_data *priv = dev_get_priv(dev);
+	struct uniphier_serial __iomem *port;
+	fdt_addr_t base;
+	u32 tmp;
 
-	while (!(readb(&port->lsr) & UART_LSR_THRE))
-		;
+	base = devfdt_get_addr(dev);
+	if (base == FDT_ADDR_T_NONE)
+		return -EINVAL;
 
-	writeb(c, &port->thr);
+	port = devm_ioremap(dev, base, SZ_64);
+	if (!port)
+		return -ENOMEM;
+
+	priv->membase = port;
+
+	priv->uartclk = fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev),
+				       "clock-frequency", 0);
+
+	tmp = readl(&port->lcr_mcr);
+	tmp &= ~LCR_MASK;
+	tmp |= UART_LCR_WLEN8 << LCR_SHIFT;
+	writel(tmp, &port->lcr_mcr);
+
+	return 0;
 }
 
-static struct uniphier_serial *serial_ports[4] = {
-#ifdef CONFIG_SYS_UNIPHIER_SERIAL_BASE0
-	(struct uniphier_serial *)CONFIG_SYS_UNIPHIER_SERIAL_BASE0,
-#else
-	NULL,
-#endif
-#ifdef CONFIG_SYS_UNIPHIER_SERIAL_BASE1
-	(struct uniphier_serial *)CONFIG_SYS_UNIPHIER_SERIAL_BASE1,
-#else
-	NULL,
-#endif
-#ifdef CONFIG_SYS_UNIPHIER_SERIAL_BASE2
-	(struct uniphier_serial *)CONFIG_SYS_UNIPHIER_SERIAL_BASE2,
-#else
-	NULL,
-#endif
-#ifdef CONFIG_SYS_UNIPHIER_SERIAL_BASE3
-	(struct uniphier_serial *)CONFIG_SYS_UNIPHIER_SERIAL_BASE3,
-#else
-	NULL,
-#endif
+static const struct udevice_id uniphier_uart_of_match[] = {
+	{ .compatible = "socionext,uniphier-uart" },
+	{ /* sentinel */ }
 };
 
-/* Multi serial device functions */
-#define DECLARE_ESERIAL_FUNCTIONS(port) \
-	static int  eserial##port##_init(void) \
-	{ \
-		uniphier_serial_init(serial_ports[port]); \
-		return 0 ; \
-	} \
-	static void eserial##port##_setbrg(void) \
-	{ \
-		uniphier_serial_setbrg(serial_ports[port]); \
-	} \
-	static int  eserial##port##_getc(void) \
-	{ \
-		return uniphier_serial_getc(serial_ports[port]); \
-	} \
-	static int  eserial##port##_tstc(void) \
-	{ \
-		return uniphier_serial_tstc(serial_ports[port]); \
-	} \
-	static void eserial##port##_putc(const char c) \
-	{ \
-		uniphier_serial_putc(serial_ports[port], c); \
-	}
+static const struct dm_serial_ops uniphier_serial_ops = {
+	.setbrg = uniphier_serial_setbrg,
+	.getc = uniphier_serial_getc,
+	.putc = uniphier_serial_putc,
+	.pending = uniphier_serial_pending,
+};
 
-/* Serial device descriptor */
-#define INIT_ESERIAL_STRUCTURE(port, __name) {	\
-	.name	= __name,			\
-	.start	= eserial##port##_init,		\
-	.stop	= NULL,				\
-	.setbrg	= eserial##port##_setbrg,	\
-	.getc	= eserial##port##_getc,		\
-	.tstc	= eserial##port##_tstc,		\
-	.putc	= eserial##port##_putc,		\
-	.puts	= default_serial_puts,		\
-}
-
-#if defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE0)
-DECLARE_ESERIAL_FUNCTIONS(0);
-struct serial_device uniphier_serial0_device =
-	INIT_ESERIAL_STRUCTURE(0, "ttyS0");
-#endif
-#if defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE1)
-DECLARE_ESERIAL_FUNCTIONS(1);
-struct serial_device uniphier_serial1_device =
-	INIT_ESERIAL_STRUCTURE(1, "ttyS1");
-#endif
-#if defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE2)
-DECLARE_ESERIAL_FUNCTIONS(2);
-struct serial_device uniphier_serial2_device =
-	INIT_ESERIAL_STRUCTURE(2, "ttyS2");
-#endif
-#if defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE3)
-DECLARE_ESERIAL_FUNCTIONS(3);
-struct serial_device uniphier_serial3_device =
-	INIT_ESERIAL_STRUCTURE(3, "ttyS3");
-#endif
-
-__weak struct serial_device *default_serial_console(void)
-{
-#if defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE0)
-	return &uniphier_serial0_device;
-#elif defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE1)
-	return &uniphier_serial1_device;
-#elif defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE2)
-	return &uniphier_serial2_device;
-#elif defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE3)
-	return &uniphier_serial3_device;
-#else
-#error "No uniphier serial ports configured."
-#endif
-}
-
-void uniphier_serial_initialize(void)
-{
-#if defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE0)
-	serial_register(&uniphier_serial0_device);
-#endif
-#if defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE1)
-	serial_register(&uniphier_serial1_device);
-#endif
-#if defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE2)
-	serial_register(&uniphier_serial2_device);
-#endif
-#if defined(CONFIG_SYS_UNIPHIER_SERIAL_BASE3)
-	serial_register(&uniphier_serial3_device);
-#endif
-}
+U_BOOT_DRIVER(uniphier_serial) = {
+	.name = "uniphier-uart",
+	.id = UCLASS_SERIAL,
+	.of_match = uniphier_uart_of_match,
+	.probe = uniphier_serial_probe,
+	.priv_auto_alloc_size = sizeof(struct uniphier_serial_private_data),
+	.ops = &uniphier_serial_ops,
+};

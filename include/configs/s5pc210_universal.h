@@ -12,9 +12,6 @@
 
 #include <configs/exynos4-common.h>
 
-#define CONFIG_SYS_PROMPT	"Universal # "	/* Monitor Command Prompt */
-
-
 #define CONFIG_TIZEN			/* TIZEN lib */
 
 /* Keep L2 Cache Disabled */
@@ -29,13 +26,9 @@
 
 /* select serial console configuration */
 #define CONFIG_SERIAL2
-#define CONFIG_BAUDRATE			115200
 
 /* Console configuration */
-#define CONFIG_SYS_CONSOLE_INFO_QUIET
-#define CONFIG_SYS_CONSOLE_IS_IN_ENV
 
-#define CONFIG_BOOTARGS			"Please use defined boot"
 #define CONFIG_BOOTCOMMAND		"run mmcboot"
 #define CONFIG_DEFAULT_CONSOLE		"console=ttySAC1,115200n8\0"
 
@@ -50,11 +43,6 @@
 #define CONFIG_SYS_MEMTEST_START	CONFIG_SYS_SDRAM_BASE
 #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_SDRAM_BASE + 0x5000000)
 #define CONFIG_SYS_LOAD_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x4800000)
-
-#define CONFIG_SYS_TEXT_BASE		0x44800000
-
-#define CONFIG_MTD_DEVICE
-#define CONFIG_MTD_PARTITIONS
 
 /* Actual modem binary size is 16MiB. Add 2MiB for bad block handling */
 #define MTDIDS_DEFAULT		"onenand0=samsung-onenand"
@@ -83,7 +71,6 @@
 #define CONFIG_BOOTBLOCK	"10"
 #define CONFIG_UBIBLOCK		"9"
 
-#define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_SYS_MMC_ENV_DEV		CONFIG_MMC_DEFAULT_DEV
 #define CONFIG_ENV_SIZE			4096
 #define CONFIG_ENV_OFFSET		((32 - 4) << 10) /* 32KiB - 4KiB */
@@ -158,46 +145,13 @@
 #define CONFIG_SAMSUNG_ONENAND
 #define CONFIG_SYS_ONENAND_BASE		0x0C000000
 
-#include <asm/arch/gpio.h>
-/*
- * I2C Settings
- */
-#define CONFIG_SOFT_I2C_GPIO_SCL EXYNOS4_GPIO_B7
-#define CONFIG_SOFT_I2C_GPIO_SDA EXYNOS4_GPIO_B6
-
-#define CONFIG_CMD_I2C
-
-#define CONFIG_SYS_I2C
-#define CONFIG_SYS_I2C_SOFT		/* I2C bit-banged */
-#define CONFIG_SYS_I2C_SOFT_SPEED	50000
-#define CONFIG_SYS_I2C_SOFT_SLAVE	0
-#define CONFIG_SOFT_I2C_READ_REPEATED_START
-#define CONFIG_I2C_MULTI_BUS
-#define CONFIG_SYS_MAX_I2C_BUS	7
-
-#define CONFIG_POWER
-#define CONFIG_POWER_I2C
-#define CONFIG_POWER_MAX8998
-
-#define CONFIG_USB_GADGET
-#define CONFIG_USB_GADGET_S3C_UDC_OTG
-#define CONFIG_USB_GADGET_DUALSPEED
+#define CONFIG_USB_GADGET_DWC2_OTG_PHY
 
 /*
  * SPI Settings
  */
 #define CONFIG_SOFT_SPI
-#define CONFIG_SOFT_SPI_MODE SPI_MODE_3
-#define CONFIG_SOFT_SPI_GPIO_SCLK EXYNOS4_GPIO_Y31
-#define CONFIG_SOFT_SPI_GPIO_MOSI EXYNOS4_GPIO_Y33
-#define CONFIG_SOFT_SPI_GPIO_MISO EXYNOS4_GPIO_Y30
-#define CONFIG_SOFT_SPI_GPIO_CS EXYNOS4_GPIO_Y43
 
-#define SPI_DELAY udelay(1)
-#undef SPI_INIT
-#define SPI_SCL(bit) universal_spi_scl(bit)
-#define SPI_SDA(bit) universal_spi_sda(bit)
-#define SPI_READ universal_spi_read()
 #ifndef	__ASSEMBLY__
 void universal_spi_scl(int bit);
 void universal_spi_sda(int bit);
@@ -215,7 +169,6 @@ int universal_spi_read(void);
 
 /* Download menu - definitions for check keys */
 #ifndef __ASSEMBLY__
-#include <power/max8998_pmic.h>
 
 #define KEY_PWR_PMIC_NAME		"MAX8998_PMIC"
 #define KEY_PWR_STATUS_REG		MAX8998_REG_STATUS1
@@ -229,14 +182,10 @@ int universal_spi_read(void);
 
 /* LCD console */
 #define LCD_BPP			LCD_COLOR16
-#define CONFIG_SYS_WHITE_ON_BLACK
 
 /*
  * LCD Settings
  */
-#define CONFIG_EXYNOS_FB
-#define CONFIG_LCD
-#define CONFIG_CMD_BMP
 #define CONFIG_BMP_16BPP
 #define CONFIG_LD9040
 #define CONFIG_VIDEO_BMP_GZIP

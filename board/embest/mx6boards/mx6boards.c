@@ -18,12 +18,13 @@
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/iomux.h>
 #include <asm/arch/mx6-pins.h>
-#include <asm/errno.h>
+#include <linux/errno.h>
 #include <asm/gpio.h>
-#include <asm/imx-common/iomux-v3.h>
-#include <asm/imx-common/boot_mode.h>
-#include <asm/imx-common/mxc_i2c.h>
-#include <asm/imx-common/video.h>
+#include <asm/mach-imx/iomux-v3.h>
+#include <asm/mach-imx/boot_mode.h>
+#include <asm/mach-imx/mxc_i2c.h>
+#include <asm/mach-imx/spi.h>
+#include <asm/mach-imx/video.h>
 #include <i2c.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
@@ -215,12 +216,12 @@ int board_mmc_getcd(struct mmc *mmc)
 
 int board_mmc_init(bd_t *bis)
 {
-	s32 status = 0;
+	int ret;
 	int i;
 
 	/*
 	 * According to the board_mmc_init() the following map is done:
-	 * (U-boot device node)    (Physical Port)
+	 * (U-Boot device node)    (Physical Port)
 	 * ** RiOTboard :
 	 * mmc0                    SDCard slot (bottom)
 	 * mmc1                    uSDCard slot (top)
@@ -267,13 +268,15 @@ int board_mmc_init(bd_t *bis)
 			printf("Warning: you configured more USDHC controllers"
 			       "(%d) then supported by the board (%d)\n",
 			       i + 1, CONFIG_SYS_FSL_USDHC_NUM);
-			return status;
+			return -EINVAL;
 		}
 
-		status |= fsl_esdhc_initialize(bis, &usdhc_cfg[i]);
+		ret = fsl_esdhc_initialize(bis, &usdhc_cfg[i]);
+		if (ret)
+			return ret;
 	}
 
-	return status;
+	return 0;
 }
 #endif
 

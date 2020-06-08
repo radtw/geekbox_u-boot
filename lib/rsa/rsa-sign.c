@@ -9,14 +9,29 @@
 #include <string.h>
 #include <image.h>
 #include <time.h>
+#include <openssl/bn.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <openssl/evp.h>
+#include <openssl/engine.h>
 
 #if OPENSSL_VERSION_NUMBER >= 0x10000000L
 #define HAVE_ERR_REMOVE_THREAD_STATE
+#endif
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+static void RSA_get0_key(const RSA *r,
+                 const BIGNUM **n, const BIGNUM **e, const BIGNUM **d)
+{
+   if (n != NULL)
+       *n = r->n;
+   if (e != NULL)
+       *e = r->e;
+   if (d != NULL)
+       *d = r->d;
+}
 #endif
 
 static int rsa_err(const char *msg)
@@ -31,14 +46,14 @@ static int rsa_err(const char *msg)
 }
 
 /**
- * rsa_get_pub_key() - read a public key from a .crt file
+ * rsa_pem_get_pub_key() - read a public key from a .crt file
  *
  * @keydir:	Directory containins the key
  * @name	Name of key file (will have a .crt extension)
  * @rsap	Returns RSA object, or NULL on failure
  * @return 0 if ok, -ve on error (in which case *rsap will be set to NULL)
  */
-static int rsa_get_pub_key(const char *keydir, const char *name, RSA **rsap)
+static int rsa_pem_get_pub_key(const char *keydir, const char *name, RSA **rsap)
 {
 	char path[1024];
 	EVP_PKEY *key;
@@ -96,14 +111,90 @@ err_cert:
 }
 
 /**
- * rsa_get_priv_key() - read a private key from a .key file
+ * rsa_engine_get_pub_key() - read a public key from given engine
  *
- * @keydir:	Directory containins the key
+ * @keydir:	Key prefix
+ * @name	Name of key
+ * @engine	Engine to use
+ * @rsap	Returns RSA object, or NULL on failure
+ * @return 0 if ok, -ve on error (in which case *rsap will be set to NULL)
+ */
+static int rsa_engine_get_pub_key(const char *keydir, const char *name,
+				  ENGINE *engine, RSA **rsap)
+{
+	const char *engine_id;
+	char key_id[1024];
+	EVP_PKEY *key;
+	RSA *rsa;
+	int ret;
+
+	*rsap = NULL;
+
+	engine_id = ENGINE_get_id(engine);
+
+	if (engine_id && !strcmp(engine_id, "pkcs11")) {
+		if (keydir)
+			snprintf(key_id, sizeof(key_id),
+				 "pkcs11:%s;object=%s;type=public",
+				 keydir, name);
+		else
+			snprintf(key_id, sizeof(key_id),
+				 "pkcs11:object=%s;type=public",
+				 name);
+	} else {
+		fprintf(stderr, "Engine not supported\n");
+		return -ENOTSUP;
+	}
+
+	key = ENGINE_load_public_key(engine, key_id, NULL, NULL);
+	if (!key)
+		return rsa_err("Failure loading public key from engine");
+
+	/* Convert to a RSA_style key. */
+	rsa = EVP_PKEY_get1_RSA(key);
+	if (!rsa) {
+		rsa_err("Couldn't convert to a RSA style key");
+		ret = -EINVAL;
+		goto err_rsa;
+	}
+
+	EVP_PKEY_free(key);
+	*rsap = rsa;
+
+	return 0;
+
+err_rsa:
+	EVP_PKEY_free(key);
+	return ret;
+}
+
+/**
+ * rsa_get_pub_key() - read a public key
+ *
+ * @keydir:	Directory containing the key (PEM file) or key prefix (engine)
+ * @name	Name of key file (will have a .crt extension)
+ * @engine	Engine to use
+ * @rsap	Returns RSA object, or NULL on failure
+ * @return 0 if ok, -ve on error (in which case *rsap will be set to NULL)
+ */
+static int rsa_get_pub_key(const char *keydir, const char *name,
+			   ENGINE *engine, RSA **rsap)
+{
+	if (engine)
+		return rsa_engine_get_pub_key(keydir, name, engine, rsap);
+	return rsa_pem_get_pub_key(keydir, name, rsap);
+}
+
+/**
+ * rsa_pem_get_priv_key() - read a private key from a .key file
+ *
+ * @keydir:	Directory containing the key
  * @name	Name of key file (will have a .key extension)
  * @rsap	Returns RSA object, or NULL on failure
  * @return 0 if ok, -ve on error (in which case *rsap will be set to NULL)
  */
-static int rsa_get_priv_key(const char *keydir, const char *name, RSA **rsap)
+static int rsa_pem_get_priv_key(const char *keydir, const char *name,
+				RSA **rsap)
 {
 	char path[1024];
 	RSA *rsa;
@@ -130,26 +221,149 @@ static int rsa_get_priv_key(const char *keydir, const char *name, RSA **rsap)
 	return 0;
 }
 
+/**
+ * rsa_engine_get_priv_key() - read a private key from given engine
+ *
+ * @keydir:	Key prefix
+ * @name	Name of key
+ * @engine	Engine to use
+ * @rsap	Returns RSA object, or NULL on failure
+ * @return 0 if ok, -ve on error (in which case *rsap will be set to NULL)
+ */
+static int rsa_engine_get_priv_key(const char *keydir, const char *name,
+				   ENGINE *engine, RSA **rsap)
+{
+	const char *engine_id;
+	char key_id[1024];
+	EVP_PKEY *key;
+	RSA *rsa;
+	int ret;
+
+	*rsap = NULL;
+
+	engine_id = ENGINE_get_id(engine);
+
+	if (engine_id && !strcmp(engine_id, "pkcs11")) {
+		if (keydir)
+			snprintf(key_id, sizeof(key_id),
+				 "pkcs11:%s;object=%s;type=private",
+				 keydir, name);
+		else
+			snprintf(key_id, sizeof(key_id),
+				 "pkcs11:object=%s;type=private",
+				 name);
+	} else {
+		fprintf(stderr, "Engine not supported\n");
+		return -ENOTSUP;
+	}
+
+	key = ENGINE_load_private_key(engine, key_id, NULL, NULL);
+	if (!key)
+		return rsa_err("Failure loading private key from engine");
+
+	/* Convert to a RSA_style key. */
+	rsa = EVP_PKEY_get1_RSA(key);
+	if (!rsa) {
+		rsa_err("Couldn't convert to a RSA style key");
+		ret = -EINVAL;
+		goto err_rsa;
+	}
+
+	EVP_PKEY_free(key);
+	*rsap = rsa;
+
+	return 0;
+
+err_rsa:
+	EVP_PKEY_free(key);
+	return ret;
+}
+
+/**
+ * rsa_get_priv_key() - read a private key
+ *
+ * @keydir:	Directory containing the key (PEM file) or key prefix (engine)
+ * @name	Name of key
+ * @engine	Engine to use for signing
+ * @rsap	Returns RSA object, or NULL on failure
+ * @return 0 if ok, -ve on error (in which case *rsap will be set to NULL)
+ */
+static int rsa_get_priv_key(const char *keydir, const char *name,
+			    ENGINE *engine, RSA **rsap)
+{
+	if (engine)
+		return rsa_engine_get_priv_key(keydir, name, engine, rsap);
+	return rsa_pem_get_priv_key(keydir, name, rsap);
+}
+
 static int rsa_init(void)
 {
 	int ret;
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	ret = SSL_library_init();
+#else
+	ret = OPENSSL_init_ssl(0, NULL);
+#endif
 	if (!ret) {
 		fprintf(stderr, "Failure to init SSL library\n");
 		return -1;
 	}
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	SSL_load_error_strings();
 
 	OpenSSL_add_all_algorithms();
 	OpenSSL_add_all_digests();
 	OpenSSL_add_all_ciphers();
+#endif
 
 	return 0;
 }
 
+static int rsa_engine_init(const char *engine_id, ENGINE **pe)
+{
+	ENGINE *e;
+	int ret;
+
+	ENGINE_load_builtin_engines();
+
+	e = ENGINE_by_id(engine_id);
+	if (!e) {
+		fprintf(stderr, "Engine isn't available\n");
+		ret = -1;
+		goto err_engine_by_id;
+	}
+
+	if (!ENGINE_init(e)) {
+		fprintf(stderr, "Couldn't initialize engine\n");
+		ret = -1;
+		goto err_engine_init;
+	}
+
+	if (!ENGINE_set_default_RSA(e)) {
+		fprintf(stderr, "Couldn't set engine as default for RSA\n");
+		ret = -1;
+		goto err_set_rsa;
+	}
+
+	*pe = e;
+
+	return 0;
+
+err_set_rsa:
+	ENGINE_finish(e);
+err_engine_init:
+	ENGINE_free(e);
+err_engine_by_id:
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	ENGINE_cleanup();
+#endif
+	return ret;
+}
+
 static void rsa_remove(void)
 {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	CRYPTO_cleanup_all_ex_data();
 	ERR_free_strings();
 #ifdef HAVE_ERR_REMOVE_THREAD_STATE
@@ -158,6 +372,15 @@ static void rsa_remove(void)
 	ERR_remove_state(0);
 #endif
 	EVP_cleanup();
+#endif
+}
+
+static void rsa_engine_remove(ENGINE *e)
+{
+	if (e) {
+		ENGINE_finish(e);
+		ENGINE_free(e);
+	}
 }
 
 static int rsa_sign_with_key(RSA *rsa, struct checksum_algo *checksum_algo,
@@ -210,7 +433,11 @@ static int rsa_sign_with_key(RSA *rsa, struct checksum_algo *checksum_algo,
 		ret = rsa_err("Could not obtain signature");
 		goto err_sign;
 	}
-	EVP_MD_CTX_cleanup(context);
+	#if OPENSSL_VERSION_NUMBER < 0x10100000L
+		EVP_MD_CTX_cleanup(context);
+	#else
+		EVP_MD_CTX_reset(context);
+	#endif
 	EVP_MD_CTX_destroy(context);
 	EVP_PKEY_free(key);
 
@@ -235,21 +462,30 @@ int rsa_sign(struct image_sign_info *info,
 	     uint8_t **sigp, uint *sig_len)
 {
 	RSA *rsa;
+	ENGINE *e = NULL;
 	int ret;
 
 	ret = rsa_init();
 	if (ret)
 		return ret;
 
-	ret = rsa_get_priv_key(info->keydir, info->keyname, &rsa);
+	if (info->engine_id) {
+		ret = rsa_engine_init(info->engine_id, &e);
+		if (ret)
+			goto err_engine;
+	}
+
+	ret = rsa_get_priv_key(info->keydir, info->keyname, e, &rsa);
 	if (ret)
 		goto err_priv;
-	ret = rsa_sign_with_key(rsa, info->algo->checksum, region,
+	ret = rsa_sign_with_key(rsa, info->checksum, region,
 				region_count, sigp, sig_len);
 	if (ret)
 		goto err_sign;
 
 	RSA_free(rsa);
+	if (info->engine_id)
+		rsa_engine_remove(e);
 	rsa_remove();
 
 	return ret;
@@ -257,6 +493,9 @@ int rsa_sign(struct image_sign_info *info,
 err_sign:
 	RSA_free(rsa);
 err_priv:
+	if (info->engine_id)
+		rsa_engine_remove(e);
+err_engine:
 	rsa_remove();
 	return ret;
 }
@@ -268,6 +507,7 @@ static int rsa_get_exponent(RSA *key, uint64_t *e)
 {
 	int ret;
 	BIGNUM *bn_te;
+	const BIGNUM *key_e;
 	uint64_t te;
 
 	ret = -EINVAL;
@@ -276,17 +516,18 @@ static int rsa_get_exponent(RSA *key, uint64_t *e)
 	if (!e)
 		goto cleanup;
 
-	if (BN_num_bits(key->e) > 64)
+	RSA_get0_key(key, NULL, &key_e, NULL);
+	if (BN_num_bits(key_e) > 64)
 		goto cleanup;
 
-	*e = BN_get_word(key->e);
+	*e = BN_get_word(key_e);
 
-	if (BN_num_bits(key->e) < 33) {
+	if (BN_num_bits(key_e) < 33) {
 		ret = 0;
 		goto cleanup;
 	}
 
-	bn_te = BN_dup(key->e);
+	bn_te = BN_dup(key_e);
 	if (!bn_te)
 		goto cleanup;
 
@@ -312,10 +553,12 @@ cleanup:
  * rsa_get_params(): - Get the important parameters of an RSA public key
  */
 int rsa_get_params(RSA *key, uint64_t *exponent, uint32_t *n0_invp,
-		   BIGNUM **modulusp, BIGNUM **r_squaredp)
+		   BIGNUM **modulusp, BIGNUM **exponent_BN, BIGNUM **r_squaredp,
+		   BIGNUM **c_factorp, BIGNUM **np_factorp)
 {
-	BIGNUM *big1, *big2, *big32, *big2_32;
-	BIGNUM *n, *r, *r_squared, *tmp;
+	BIGNUM *big1, *big2, *big32, *big2_32, *big4100, *big2180;
+	BIGNUM *n, *e, *r, *r_squared, *tmp, *c_factor, *np_factor;
+	const BIGNUM *key_n, *key_e;
 	BN_CTX *bn_ctx = BN_CTX_new();
 	int ret = 0;
 
@@ -323,13 +566,20 @@ int rsa_get_params(RSA *key, uint64_t *exponent, uint32_t *n0_invp,
 	big1 = BN_new();
 	big2 = BN_new();
 	big32 = BN_new();
+	big4100 = BN_new();
+	big2180 = BN_new();
+
 	r = BN_new();
 	r_squared = BN_new();
+	c_factor = BN_new();
+	np_factor = BN_new();
 	tmp = BN_new();
 	big2_32 = BN_new();
 	n = BN_new();
-	if (!big1 || !big2 || !big32 || !r || !r_squared || !tmp || !big2_32 ||
-	    !n) {
+	e = BN_new();
+	if (!big1 || !big2 || !big32 || !big4100 || !big2180 || !r ||
+	    !r_squared || !tmp || !big2_32 || !n || !e ||
+	    !c_factor || !np_factor) {
 		fprintf(stderr, "Out of memory (bignum)\n");
 		return -ENOMEM;
 	}
@@ -337,8 +587,11 @@ int rsa_get_params(RSA *key, uint64_t *exponent, uint32_t *n0_invp,
 	if (0 != rsa_get_exponent(key, exponent))
 		ret = -1;
 
-	if (!BN_copy(n, key->n) || !BN_set_word(big1, 1L) ||
-	    !BN_set_word(big2, 2L) || !BN_set_word(big32, 32L))
+	RSA_get0_key(key, &key_n, &key_e, NULL);
+	if (!BN_copy(n, key_n) || !BN_copy(e, key_e) ||
+	    !BN_set_word(big1, 1L) ||
+	    !BN_set_word(big2, 2L) || !BN_set_word(big32, 32L) ||
+	    !BN_set_word(big4100, 4100L) || !BN_set_word(big2180, 2180L))
 		ret = -1;
 
 	/* big2_32 = 2^32 */
@@ -362,12 +615,27 @@ int rsa_get_params(RSA *key, uint64_t *exponent, uint32_t *n0_invp,
 	    !BN_mod(r_squared, tmp, n, bn_ctx))
 		ret = -1;
 
+	/* Calculate c_factor = 2^4100 mod n */
+	if (!BN_exp(tmp, big2, big4100, bn_ctx) ||
+	    !BN_mod(c_factor, tmp, n, bn_ctx))
+		ret = -1;
+
+	/* Calculate np_factor = 2^2180 div n */
+	if (!BN_exp(tmp, big2, big2180, bn_ctx) ||
+	    !BN_div(np_factor, NULL, tmp, n, bn_ctx))
+		ret = -1;
+
 	*modulusp = n;
+	*exponent_BN = e;
 	*r_squaredp = r_squared;
+	*c_factorp = c_factor;
+	*np_factorp = np_factor;
 
 	BN_free(big1);
 	BN_free(big2);
 	BN_free(big32);
+	BN_free(big4100);
+	BN_free(big2180);
 	BN_free(r);
 	BN_free(tmp);
 	BN_free(big2_32);
@@ -420,11 +688,13 @@ static int fdt_add_bignum(void *blob, int noffset, const char *prop_name,
 		BN_rshift(num, num, 32); /*  N = N/B */
 	}
 
+	/*
+	 * We try signing with successively increasing size values, so this
+	 * might fail several times
+	 */
 	ret = fdt_setprop(blob, noffset, prop_name, buf, size);
-	if (ret) {
-		fprintf(stderr, "Failed to write public key to FIT\n");
-		return -ENOSPC;
-	}
+	if (ret)
+		return -FDT_ERR_NOSPACE;
 	free(buf);
 	BN_free(tmp);
 	BN_free(big2);
@@ -436,7 +706,7 @@ static int fdt_add_bignum(void *blob, int noffset, const char *prop_name,
 
 int rsa_add_verify_data(struct image_sign_info *info, void *keydest)
 {
-	BIGNUM *modulus, *r_squared;
+	BIGNUM *modulus, *exponent_BN, *r_squared, *c_factor, *np_factor;
 	uint64_t exponent;
 	uint32_t n0_inv;
 	int parent, node;
@@ -444,14 +714,21 @@ int rsa_add_verify_data(struct image_sign_info *info, void *keydest)
 	int ret;
 	int bits;
 	RSA *rsa;
+	ENGINE *e = NULL;
 
 	debug("%s: Getting verification data\n", __func__);
-	ret = rsa_get_pub_key(info->keydir, info->keyname, &rsa);
+	if (info->engine_id) {
+		ret = rsa_engine_init(info->engine_id, &e);
+		if (ret)
+			return ret;
+	}
+	ret = rsa_get_pub_key(info->keydir, info->keyname, e, &rsa);
 	if (ret)
-		return ret;
-	ret = rsa_get_params(rsa, &exponent, &n0_inv, &modulus, &r_squared);
+		goto err_get_pub_key;
+	ret = rsa_get_params(rsa, &exponent, &n0_inv, &modulus,
+			     &exponent_BN, &r_squared, &c_factor, &np_factor);
 	if (ret)
-		return ret;
+		goto err_get_params;
 	bits = BN_num_bits(modulus);
 	parent = fdt_subnode_offset(keydest, 0, FIT_SIG_NODENAME);
 	if (parent == -FDT_ERR_NOTFOUND) {
@@ -497,6 +774,10 @@ int rsa_add_verify_data(struct image_sign_info *info, void *keydest)
 		ret = fdt_setprop_u64(keydest, node, "rsa,exponent", exponent);
 	}
 	if (!ret) {
+		ret = fdt_add_bignum(keydest, node, "rsa,exponent-BN",
+				     exponent_BN, bits);
+	}
+	if (!ret) {
 		ret = fdt_add_bignum(keydest, node, "rsa,modulus", modulus,
 				     bits);
 	}
@@ -505,10 +786,18 @@ int rsa_add_verify_data(struct image_sign_info *info, void *keydest)
 				     bits);
 	}
 	if (!ret) {
-		ret = fdt_setprop_string(keydest, node, FIT_ALGO_PROP,
-					 info->algo->name);
+		ret = fdt_add_bignum(keydest, node, "rsa,c", c_factor,
+				     bits);
 	}
-	if (info->require_keys) {
+	if (!ret) {
+		ret = fdt_add_bignum(keydest, node, "rsa,np", np_factor,
+				     bits);
+	}
+	if (!ret) {
+		ret = fdt_setprop_string(keydest, node, FIT_ALGO_PROP,
+					 info->name);
+	}
+	if (!ret && info->require_keys) {
 		ret = fdt_setprop_string(keydest, node, "required",
 					 info->require_keys);
 	}
@@ -516,7 +805,12 @@ done:
 	BN_free(modulus);
 	BN_free(r_squared);
 	if (ret)
-		return ret == -FDT_ERR_NOSPACE ? -ENOSPC : -EIO;
+		ret = ret == -FDT_ERR_NOSPACE ? -ENOSPC : -EIO;
+err_get_params:
+	RSA_free(rsa);
+err_get_pub_key:
+	if (info->engine_id)
+		rsa_engine_remove(e);
 
-	return 0;
+	return ret;
 }

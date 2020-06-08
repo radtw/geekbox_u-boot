@@ -22,9 +22,15 @@ extern char __kprobes_text_start[], __kprobes_text_end[];
 extern char __entry_text_start[], __entry_text_end[];
 extern char __initdata_begin[], __initdata_end[];
 extern char __start_rodata[], __end_rodata[];
+extern char __efi_hello_world_begin[];
+extern char __efi_hello_world_end[];
 
 /* Start and end of .ctors section - used for constructor calls. */
 extern char __ctors_start[], __ctors_end[];
+
+/* .ARM.exidx is sorted, so has to go in its own output section. */
+extern char __exidx_start[], __exidx_end[];
+extern char __extab_start[], __extab_end[];
 
 /* function descriptor handling (if any).  Override
  * in asm/sections.h */
@@ -56,9 +62,6 @@ extern char __text_start[];
 /* This marks the end of the text region which must be relocated */
 extern char __image_copy_end[];
 
-/* rockchip uboot loader tag */
-extern char __loader_tag[];
-
 /*
  * This is the U-Boot entry point - prior to relocation it should be same
  * as __text_start
@@ -74,6 +77,7 @@ extern char __bss_start[];
 extern char __bss_end[];
 extern char __image_copy_start[];
 extern char __image_copy_end[];
+extern char _image_binary_end[];
 extern char __rel_dyn_start[];
 extern char __rel_dyn_end[];
 
@@ -84,6 +88,7 @@ extern ulong __data_end;
 extern ulong __rel_dyn_start;
 extern ulong __rel_dyn_end;
 extern ulong __bss_end;
+extern ulong _image_binary_end;
 
 extern ulong _TEXT_BASE;	/* code start */
 

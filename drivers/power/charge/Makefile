@@ -1,8 +1,7 @@
 #
-# Copyright 2008-2015 Fuzhou Rockchip Electronics Co., Ltd
-# Peter, Software Engineering, <superpeter.cai@gmail.com>.
+# Copyright (c) 2019 Fuzhou Rockchip Electronics Co., Ltd
 #
-# SPDX-License-Identifier:	GPL-2.0+
+# SPDX-License-Identifier:     GPL-2.0+
 #
 
-obj-y += usbdev_bc.o
+obj-$(CONFIG_CHARGER_BQ25700) += bq25700_charger.o

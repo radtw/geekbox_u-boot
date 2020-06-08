@@ -4,266 +4,357 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
-#include <malloc.h>
-#include <fdtdec.h>
-#include <power/battery.h>
+#include <asm/gpio.h>
+#include <dm.h>
+#include <dm/device.h>
 #include <errno.h>
-#include <asm/arch/rkplat.h>
-#include <power/rockchip_power.h>
+#include <fdtdec.h>
 #include <i2c.h>
+#include <linux/usb/phy-rockchip-inno-usb2.h>
+#include <malloc.h>
+#include <power/battery.h>
+#include <power/fuel_gauge.h>
+#include <power/pmic.h>
+#include "fg_regs.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
 #define COMPAT_ROCKCHIP_CW201X "cw201x"
-static int state_of_chrg = 0;
-#define CW201X_I2C_ADDR		0x62
-#define CW201X_I2C_CH		0
-#define CW201X_I2C_SPEED	200000
 
-#define REG_VERSION             0x0
-#define REG_VCELL               0x2
-#define REG_SOC                 0x4
-#define REG_RRT_ALERT           0x6
-#define REG_CONFIG              0x8
-#define REG_MODE                0xA
-#define REG_BATINFO             0x10
+#define REG_VERSION		0x0
+#define REG_VCELL		0x2
+#define REG_SOC			0x4
+#define REG_RRT_ALERT		0x6
+#define REG_CONFIG		0x8
+#define REG_MODE		0xA
+#define REG_BATINFO		0x10
 
+#define MODE_SLEEP_MASK		(0x3 << 6)
+#define MODE_SLEEP		(0x3 << 6)
+#define MODE_NORMAL		(0x0 << 6)
+#define MODE_QUICK_START	(0x3 << 4)
+#define MODE_RESTART		(0xf << 0)
 
-#define MODE_SLEEP_MASK         (0x3<<6)
-#define MODE_SLEEP              (0x3<<6)
-#define MODE_NORMAL             (0x0<<6)
-#define MODE_QUICK_START        (0x3<<4)
-#define MODE_RESTART            (0xf<<0)
+#define CONFIG_UPDATE_FLG	(0x1 << 1)
+#define ATHD			(0x0 << 3)
 
-#define CONFIG_UPDATE_FLG       (0x1<<1)
-#define ATHD                    (0x0<<3)        //ATHD = 0%
-
-static int volt_tab[6] = {3466, 3586, 3670, 3804, 4014, 4316};
-
-struct cw201x {
-	struct pmic *p;
-	int node;
-	struct fdt_gpio_state dc_det;
-	int i2c_ch;
+enum charger_type {
+	CHARGER_TYPE_NO = 0,
+	CHARGER_TYPE_USB,
+	CHARGER_TYPE_AC,
+	CHARGER_TYPE_DC,
+	CHARGER_TYPE_UNDEF,
 };
 
-struct cw201x cw;
+struct cw201x_info {
+	struct udevice *dev;
+	int capacity;
+	u32 *cw_bat_config_info;
+	int divider_res1;
+	int divider_res2;
+	int hw_id_check;
+	int hw_id0;
+	int hw_id1;
+	int support_dc_adp;
+	int dc_det_gpio;
+	int dc_det_flag;
+};
 
-static int cw201x_i2c_probe(u32 bus, u32 addr)
+static u8 cw201x_read(struct cw201x_info *cw201x, u8 reg)
 {
-	char val;
-	int ret;
-	i2c_set_bus_num(bus);
-	i2c_init(CW201X_I2C_SPEED, 0);
-	ret = i2c_probe(addr);
-	if (ret < 0)
-		return -ENODEV;
-	val = i2c_reg_read(addr, REG_VERSION);
-	if (val == 0xff)
-		return -ENODEV;
-	else
-		return 0;
-}
-static int cw201x_parse_dt(const void* blob)
-{
-	int err;
-	int node;
-	u32 bus, addr;
+	u8 val;
 	int ret;
 
-	node = fdt_node_offset_by_compatible(blob,
-					0, COMPAT_ROCKCHIP_CW201X);
-	if (node < 0) {
-		printf("Can't find dts node for fuel guage cw201x\n");
-		return -ENODEV;
-	}
-
-	if (!fdt_device_is_available(blob,node)) {
-		debug("device cw201x is disabled\n");
-		return -1;
-	}
-	
-	ret = fdt_get_i2c_info(blob, node, &bus, &addr);
-	if (ret < 0) {
-		debug("fg cw201x get fdt i2c failed\n");
+	ret = dm_i2c_read(cw201x->dev, reg, &val, 1);
+	if (ret) {
+		debug("write error to device: %p register: %#x!",
+		      cw201x->dev, reg);
 		return ret;
 	}
 
-	ret = cw201x_i2c_probe(bus, addr);
-	if (ret < 0) {
-		debug("fg cw201x i2c probe failed\n");
-		return ret;
-	}
-	cw.p = pmic_alloc();
-	cw.node = node;
-	cw.p->hw.i2c.addr = addr;
-	cw.p->bus = bus;
-	err = fdtdec_decode_gpio(blob, cw.node, "dc_det_gpio", &cw.dc_det);
-	if (err) {
-		printf("decode dc_det_gpio err\n");
-		return err;
-	}
-	cw.dc_det.flags = !(cw.dc_det.flags  & OF_GPIO_ACTIVE_LOW);
-	return 0;
-}
-
-
-static int cw_read_word(int reg)
-{
-	u8 vall, valh;
-	u16 val;
-	valh = i2c_reg_read(CW201X_I2C_ADDR, reg);
-	vall = i2c_reg_read(CW201X_I2C_ADDR, reg + 1);
-	val = ((u16)valh << 8) | vall;
 	return val;
 }
 
-static int cw_get_vol(void)
+static int cw201x_write(struct cw201x_info *cw201x, u8 reg, u8 val)
 {
-        u16 value16, value16_1, value16_2, value16_3;
-        int voltage;
+	int ret;
 
-	value16 = cw_read_word(REG_VCELL);
+	ret = dm_i2c_write(cw201x->dev, reg, &val, 1);
+	if (ret) {
+		debug("write error to device: %p register: %#x!",
+		      cw201x->dev, reg);
+		return ret;
+	}
+
+	return 0;
+}
+
+static u16 cw201x_read_half_word(struct cw201x_info *cw201x, int reg)
+{
+	u8 vall, valh;
+	u16 val;
+
+	valh = cw201x_read(cw201x, reg);
+	vall = cw201x_read(cw201x, reg + 1);
+	val = ((u16)valh << 8) | vall;
+
+	return val;
+}
+
+static int cw201x_ofdata_to_platdata(struct udevice *dev)
+{
+	const void *blob = gd->fdt_blob;
+	int node = dev_of_offset(dev);
+	struct cw201x_info *cw201x = dev_get_priv(dev);
+	int ret;
+	int len, size;
+	int hw_id0_val, hw_id1_val;
+
+	if (fdt_getprop(blob, node, "bat_config_info", &len)) {
+		len /= sizeof(u32);
+		size = sizeof(*cw201x->cw_bat_config_info) * len;
+		cw201x->cw_bat_config_info = calloc(size, 1);
+		if (!cw201x->cw_bat_config_info) {
+			debug("calloc cw_bat_config_info fail\n");
+			return -EINVAL;
+		}
+		ret = fdtdec_get_int_array(blob, node,
+					   "bat_config_info",
+					   cw201x->cw_bat_config_info, len);
+		if (ret) {
+			debug("fdtdec_get cw_bat_config_info fail\n");
+			return -EINVAL;
+		}
+	}
+
+	cw201x->support_dc_adp = fdtdec_get_int(blob, node,
+						"support_dc_adp", 0);
+	if (cw201x->support_dc_adp) {
+		cw201x->dc_det_gpio = fdtdec_get_int(blob, node,
+						     "dc_det_gpio", 0);
+		if (!cw201x->dc_det_gpio)
+			return -EINVAL;
+		gpio_request(cw201x->dc_det_gpio, "dc_det_gpio");
+		gpio_direction_input(cw201x->dc_det_gpio);
+
+		cw201x->dc_det_flag = fdtdec_get_int(blob, node,
+						     "dc_det_flag", 0);
+	}
+
+	cw201x->hw_id_check = fdtdec_get_int(blob, node, "hw_id_check", 0);
+	if (cw201x->hw_id_check) {
+		cw201x->hw_id0 = fdtdec_get_int(blob, node, "hw_id0_gpio", 0);
+		if (!cw201x->hw_id0)
+			return -EINVAL;
+		gpio_request(cw201x->hw_id0, "hw_id0_gpio");
+		gpio_direction_input(cw201x->hw_id0);
+		hw_id0_val = gpio_get_value(cw201x->hw_id0);
+
+		cw201x->hw_id1 = fdtdec_get_int(blob, node, "hw_id1_gpio", 0);
+		if (!cw201x->hw_id1)
+			return -EINVAL;
+		gpio_request(cw201x->hw_id1, "hw_id1_gpio");
+		gpio_direction_input(cw201x->hw_id1);
+		hw_id1_val = gpio_get_value(cw201x->hw_id1);
+
+		/* ID1 = 0, ID0 = 1 : Battery */
+		if (!hw_id0_val || hw_id1_val)
+			return -EINVAL;
+	}
+
+	cw201x->divider_res1 = fdtdec_get_int(blob, node, "divider_res1", 0);
+	cw201x->divider_res2 = fdtdec_get_int(blob, node, "divider_res2", 0);
+
+	return 0;
+}
+
+static int cw201x_get_vol(struct cw201x_info *cw201x)
+{
+	u16 value16, value16_1, value16_2, value16_3;
+	int voltage;
+	int res1, res2;
+
+	value16 = cw201x_read_half_word(cw201x, REG_VCELL);
 	if (value16 < 0)
 		return -1;
-        
-	value16_1 = cw_read_word(REG_VCELL);
+
+	value16_1 = cw201x_read_half_word(cw201x, REG_VCELL);
 	if (value16_1 < 0)
 		return -1;
 
-	value16_2 = cw_read_word(REG_VCELL);
-        if (value16_2 < 0)
-                return -1;
-		
-		
-        if (value16 > value16_1) {	 
+	value16_2 = cw201x_read_half_word(cw201x, REG_VCELL);
+	if (value16_2 < 0)
+		return -1;
+
+	if (value16 > value16_1) {
 		value16_3 = value16;
 		value16 = value16_1;
 		value16_1 = value16_3;
-        }
-		
-        if (value16_1 > value16_2) {
-		value16_3 =value16_1;
-		value16_1 =value16_2;
-		value16_2 =value16_3;
 	}
-			
-        if (value16 >value16_1) {	 
-		value16_3 =value16;
-		value16 =value16_1;
-		value16_1 =value16_3;
-        }			
 
-        voltage = value16_1 * 305;
-        return voltage/1000;
+	if (value16_1 > value16_2) {
+		value16_3 = value16_1;
+		value16_1 = value16_2;
+		value16_2 = value16_3;
+	}
+
+	if (value16 > value16_1) {
+		value16_3 = value16;
+		value16 = value16_1;
+		value16_1 = value16_3;
+	}
+
+	voltage = value16_1 * 312 / 1024;
+
+	if (cw201x->divider_res1 &&
+	    cw201x->divider_res2) {
+		res1 = cw201x->divider_res1;
+		res2 = cw201x->divider_res2;
+		voltage = voltage * (res1 + res2) / res2;
+	}
+
+	debug("the cw201x voltage=%d\n", voltage);
+	return voltage;
 }
 
-/*
-for chack charger status in boot
-return 0, no charger
-return 1, charging
-*/
-static int cw201x_check_charge(void)
+static int cw201x_dwc_otg_check_dpdm(void)
 {
-	int ret = 0;
-	if (gpio_get_value(cw.dc_det.gpio) == cw.dc_det.flags)
-		state_of_chrg = 2;
-	else
-		state_of_chrg = 0;
-	ret = !!state_of_chrg;
-	return ret;
+#if defined(CONFIG_PHY_ROCKCHIP_INNO_USB2) && !defined(CONFIG_SPL_BUILD)
+	return rockchip_chg_get_type();
+#else
+	debug("rockchip_chg_get_type() is not implement\n");
+	return CHARGER_TYPE_NO;
+#endif
 }
 
-static int get_capcity(int volt)
+static int cw201x_get_usb_state(struct cw201x_info *cw201x)
 {
-	int i = 0;
-	int level0, level1;
+	int charger_type;
+
+	switch (cw201x_dwc_otg_check_dpdm()) {
+	case 0:
+		charger_type = CHARGER_TYPE_NO;
+		break;
+	case 1:
+	case 3:
+		charger_type = CHARGER_TYPE_USB;
+		break;
+	case 2:
+		charger_type = CHARGER_TYPE_AC;
+		break;
+	default:
+		charger_type = CHARGER_TYPE_NO;
+		break;
+	}
+
+	return charger_type;
+}
+
+static bool cw201x_get_dc_state(struct cw201x_info *cw201x)
+{
+	if (gpio_get_value(cw201x->dc_det_gpio) == cw201x->dc_det_flag)
+		return true;
+
+	return false;
+}
+
+static bool cw201x_check_charge(struct cw201x_info *cw201x)
+{
+	if (cw201x_get_usb_state(cw201x) != CHARGER_TYPE_NO)
+		return true;
+	if (cw201x_get_dc_state(cw201x))
+		return true;
+
+	return false;
+}
+
+static int cw201x_get_soc(struct cw201x_info *cw201x)
+{
 	int cap;
-	int step = 100 / (ARRAY_SIZE(volt_tab) -1);
 
+	cap = cw201x_read(cw201x, REG_SOC);
+	if ((cap < 0) || (cap > 100))
+		cap = cw201x->capacity;
 
-	for (i = 0 ; i < ARRAY_SIZE(volt_tab); i++) {
-		if (volt <= (volt_tab[i]))
-			break;
-	}
-
-	if (i == 0) 
-		return 0;
-	
-	level0 = volt_tab[i -1]; 
-	level1 = volt_tab[i];
-
-	cap = step * (i-1) + step *(volt - level0)/(level1 - level0);
-	/*printf("cap%d step:%d level0 %d level1 %d  diff %d\n",
-			cap, step, level0 ,level1, diff);*/
-	return cap;
+	cw201x->capacity = cap;
+	return cw201x->capacity;
 }
 
-static int cw201x_update_battery(struct pmic *p, struct pmic *bat)
+static int cw201x_update_get_soc(struct udevice *dev)
 {
-	struct battery *battery = bat->pbat->bat;
-	if (gpio_get_value(cw.dc_det.gpio) == cw.dc_det.flags)
-		state_of_chrg = 2;
-	else
-		state_of_chrg = 0;
-	
-	i2c_set_bus_num(cw.p->bus);
-	i2c_init (CW201X_I2C_SPEED, 0);
-	battery->voltage_uV = cw_get_vol();
-	battery->capacity = get_capcity(battery->voltage_uV);
-	battery->state_of_chrg = state_of_chrg;
-	printf("%s capacity = %d, voltage_uV = %d,state_of_chrg=%d\n",
-		bat->name,battery->capacity,battery->voltage_uV,
-		battery->state_of_chrg);
-	return 0;
+	struct cw201x_info *cw201x = dev_get_priv(dev);
+
+	return cw201x_get_soc(cw201x);
 }
 
-static int cw201x_check_battery(struct pmic *p, struct pmic *bat)
+static int cw201x_update_get_voltage(struct udevice *dev)
 {
-	struct battery *battery = bat->pbat->bat;
-	battery->state_of_chrg = cw201x_check_charge();
-	return 0;
+	struct cw201x_info *cw201x = dev_get_priv(dev);
+
+	return cw201x_get_vol(cw201x);
 }
 
-static struct power_fg cw201x_fg_ops = {
-	.fg_battery_check = cw201x_check_battery,
-	.fg_battery_update = cw201x_update_battery,
+static bool cw201x_update_get_chrg_online(struct udevice *dev)
+{
+	struct cw201x_info *cw201x = dev_get_priv(dev);
+
+	return cw201x_check_charge(cw201x);
+}
+
+static int cw201x_capability(struct udevice *dev)
+{
+	return FG_CAP_FUEL_GAUGE;
+}
+
+static struct dm_fuel_gauge_ops cw201x_fg_ops = {
+	.capability = cw201x_capability,
+	.get_soc = cw201x_update_get_soc,
+	.get_voltage = cw201x_update_get_voltage,
+	.get_chrg_online = cw201x_update_get_chrg_online,
 };
 
-
-static int fg_cw201x_cfg(void)
+static int cw201x_fg_cfg(struct cw201x_info *cw201x)
 {
 	u8 val = MODE_SLEEP;
-	u8 addr = cw.p->hw.i2c.addr;
+	int i;
 
-	i2c_set_bus_num(cw.p->bus);
-	i2c_init (CW201X_I2C_SPEED, 0);
-        if ((val & MODE_SLEEP_MASK) == MODE_SLEEP) {
-                val = MODE_NORMAL;
-                i2c_reg_write(addr, REG_MODE, val);
-        }
-
-        return 0;
-
-}
-int fg_cw201x_init(unsigned char bus)
-{
-	static const char name[] = "CW201X_FG";
-	int ret;
-	if (!cw.p) {
-		if (!gd->fdt_blob)
-			return -1;
-
-		ret = cw201x_parse_dt(gd->fdt_blob);
-		if (ret < 0)
-			return ret;
+	if ((val & MODE_SLEEP_MASK) == MODE_SLEEP) {
+		val = MODE_NORMAL;
+		cw201x_write(cw201x, REG_MODE, val);
 	}
 
-	cw.p->name = name;
-	cw.p->interface = PMIC_I2C;
-	cw.p->fg = &cw201x_fg_ops;
-	cw.p->pbat = calloc(sizeof(struct  power_battery), 1);
-	fg_cw201x_cfg();
+	for (i = 0; i < 64; i++) {
+		cw201x_write(cw201x, REG_BATINFO + i,
+			     (u8)cw201x->cw_bat_config_info[i]);
+	}
+
 	return 0;
 }
 
+static int cw201x_fg_probe(struct udevice *dev)
+{
+	struct cw201x_info *cw201x = dev_get_priv(dev);
+
+	cw201x->dev = dev;
+	cw201x_fg_cfg(cw201x);
+
+	debug("vol: %d, soc: %d\n",
+	      cw201x_get_vol(cw201x), cw201x_get_soc(cw201x));
+
+	return 0;
+}
+
+static const struct udevice_id cw201x_ids[] = {
+	{ .compatible = "cw201x" },
+	{ }
+};
+
+U_BOOT_DRIVER(cw201x_fg) = {
+	.name = "cw201x_fg",
+	.id = UCLASS_FG,
+	.of_match = cw201x_ids,
+	.probe = cw201x_fg_probe,
+	.ofdata_to_platdata = cw201x_ofdata_to_platdata,
+	.ops = &cw201x_fg_ops,
+	.priv_auto_alloc_size = sizeof(struct cw201x_info),
+};

@@ -1,8 +1,5 @@
 if TARGET_LS1021AQDS
 
-config SYS_CPU
-	default "armv7"
-
 config SYS_BOARD
 	default "ls1021aqds"
 
@@ -14,5 +11,7 @@ config SYS_SOC
 
 config SYS_CONFIG_NAME
 	default "ls1021aqds"
+
+source "board/freescale/common/Kconfig"
 
 endif

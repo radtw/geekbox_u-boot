@@ -24,6 +24,16 @@ import commit
 import terminal
 import toolchain
 
+settings_data = '''
+# Buildman settings file
+
+[toolchain]
+main: /usr/sbin
+
+[toolchain-alias]
+x86: i386 x86_64
+'''
+
 errors = [
     '''main.c: In function 'main_loop':
 main.c:260:6: warning: unused variable 'joe' [-Wunused-variable]
@@ -79,9 +89,10 @@ boards = [
     ['Active', 'arm', 'armv7', '', 'Tester', 'ARM Board 1', 'board0',  ''],
     ['Active', 'arm', 'armv7', '', 'Tester', 'ARM Board 2', 'board1', ''],
     ['Active', 'powerpc', 'powerpc', '', 'Tester', 'PowerPC board 1', 'board2', ''],
-    ['Active', 'powerpc', 'mpc5xx', '', 'Tester', 'PowerPC board 2', 'board3', ''],
     ['Active', 'sandbox', 'sandbox', '', 'Tester', 'Sandbox board', 'board4', ''],
 ]
+
+BASE_DIR = 'base'
 
 class Options:
     """Class that holds build options"""
@@ -111,8 +122,11 @@ class TestBuild(unittest.TestCase):
             self.boards.AddBoard(board.Board(*brd))
         self.boards.SelectBoards([])
 
+        # Add some test settings
+        bsettings.Setup(None)
+        bsettings.AddFile(settings_data)
+
         # Set up the toolchains
-        bsettings.Setup()
         self.toolchains = toolchain.Toolchains()
         self.toolchains.Add('arm-linux-gcc', test=False)
         self.toolchains.Add('sparc-linux-gcc', test=False)
@@ -154,7 +168,7 @@ class TestBuild(unittest.TestCase):
         expected_colour = col.GREEN if ok else col.RED
         expect = '%10s: ' % arch
         # TODO(sjg@chromium.org): If plus is '', we shouldn't need this
-        expect += col.Color(expected_colour, plus)
+        expect += ' ' + col.Color(expected_colour, plus)
         expect += '  '
         for board in boards:
             expect += col.Color(expected_colour, ' %s' % board)
@@ -183,9 +197,9 @@ class TestBuild(unittest.TestCase):
             if line.text.strip():
                 count += 1
 
-        # We should get one starting message, then an update for every commit
+        # We should get two starting messages, then an update for every commit
         # built.
-        self.assertEqual(count, len(commits) * len(boards) + 1)
+        self.assertEqual(count, len(commits) * len(boards) + 2)
         build.SetDisplayOptions(show_errors=True);
         build.ShowSummary(self.commits, board_selected)
         #terminal.EchoPrintTestLines()
@@ -341,6 +355,64 @@ class TestBuild(unittest.TestCase):
         self.assertEqual(self.boards.SelectBoards(['sandbox sandbox',
                                                    'sandbox']),
                          {'all': 1, 'sandbox': 1})
+    def CheckDirs(self, build, dirname):
+        self.assertEqual('base%s' % dirname, build._GetOutputDir(1))
+        self.assertEqual('base%s/fred' % dirname,
+                         build.GetBuildDir(1, 'fred'))
+        self.assertEqual('base%s/fred/done' % dirname,
+                         build.GetDoneFile(1, 'fred'))
+        self.assertEqual('base%s/fred/u-boot.sizes' % dirname,
+                         build.GetFuncSizesFile(1, 'fred', 'u-boot'))
+        self.assertEqual('base%s/fred/u-boot.objdump' % dirname,
+                         build.GetObjdumpFile(1, 'fred', 'u-boot'))
+        self.assertEqual('base%s/fred/err' % dirname,
+                         build.GetErrFile(1, 'fred'))
+
+    def testOutputDir(self):
+        build = builder.Builder(self.toolchains, BASE_DIR, None, 1, 2,
+                                checkout=False, show_unknown=False)
+        build.commits = self.commits
+        build.commit_count = len(self.commits)
+        subject = self.commits[1].subject.translate(builder.trans_valid_chars)
+        dirname ='/%02d_of_%02d_g%s_%s' % (2, build.commit_count, commits[1][0],
+                                           subject[:20])
+        self.CheckDirs(build, dirname)
+
+    def testOutputDirCurrent(self):
+        build = builder.Builder(self.toolchains, BASE_DIR, None, 1, 2,
+                                checkout=False, show_unknown=False)
+        build.commits = None
+        build.commit_count = 0
+        self.CheckDirs(build, '/current')
+
+    def testOutputDirNoSubdirs(self):
+        build = builder.Builder(self.toolchains, BASE_DIR, None, 1, 2,
+                                checkout=False, show_unknown=False,
+                                no_subdirs=True)
+        build.commits = None
+        build.commit_count = 0
+        self.CheckDirs(build, '')
+
+    def testToolchainAliases(self):
+        self.assertTrue(self.toolchains.Select('arm') != None)
+        with self.assertRaises(ValueError):
+            self.toolchains.Select('no-arch')
+        with self.assertRaises(ValueError):
+            self.toolchains.Select('x86')
+
+        self.toolchains = toolchain.Toolchains()
+        self.toolchains.Add('x86_64-linux-gcc', test=False)
+        self.assertTrue(self.toolchains.Select('x86') != None)
+
+        self.toolchains = toolchain.Toolchains()
+        self.toolchains.Add('i386-linux-gcc', test=False)
+        self.assertTrue(self.toolchains.Select('x86') != None)
+
+    def testToolchainDownload(self):
+        """Test that we can download toolchains"""
+        self.assertEqual('https://www.kernel.org/pub/tools/crosstool/files/bin/x86_64/4.9.0/x86_64-gcc-4.9.0-nolibc_arm-unknown-linux-gnueabi.tar.xz',
+            self.toolchains.LocateArchUrl('arm'))
+
 
 if __name__ == "__main__":
     unittest.main()

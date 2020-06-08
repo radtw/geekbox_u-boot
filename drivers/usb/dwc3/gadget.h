@@ -55,18 +55,6 @@ struct dwc3;
 
 /* DEPXFERCFG parameter 0 */
 #define DWC3_DEPXFERCFG_NUM_XFER_RES(n)	((n) & 0xffff)
-#ifdef CONFIG_RK_DWC3_UDC
-struct rk_udc_private_data{
-	/* IN/OUT EP's and corresponding requests */
-	struct usb_ep *in_ep;
-	struct usb_ep *out_ep;
-	struct usb_request *in_req;
-	struct usb_request *in_req2;
-	struct usb_request *out_req;
-	struct usb_request *out_req2;
-	struct usb_request *ep0_req;
-};
-#endif
 
 /* -------------------------------------------------------------------------- */
 

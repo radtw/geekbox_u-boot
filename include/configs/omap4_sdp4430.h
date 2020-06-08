@@ -21,15 +21,8 @@
 
 #include <configs/ti_omap4_common.h>
 
-/* Battery Charger */
-#ifndef CONFIG_SPL_BUILD
-#define CONFIG_CMD_BAT			1
-#endif
-
 /* ENV related config options */
-#define CONFIG_ENV_IS_IN_MMC		1
 #define CONFIG_SYS_MMC_ENV_DEV		1	/* SLOT2: eMMC(1) */
 #define CONFIG_ENV_OFFSET		0xE0000
-#define CONFIG_CMD_SAVEENV
 
 #endif /* __CONFIG_SDP4430_H */
