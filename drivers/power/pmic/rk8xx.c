@@ -4,6 +4,9 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
+#if 0 && TSAI
+#define DEBUG 1
+#endif
 
 #include <common.h>
 #include <dm.h>
@@ -286,7 +289,10 @@ static int rk8xx_bind(struct udevice *dev)
 {
 	ofnode regulators_node;
 	int children;
-
+#if TSAI
+	printf("rk8xx_bind\n");
+	//__asm("hlt #0");
+#endif
 	regulators_node = dev_read_subnode(dev, "regulators");
 	if (!ofnode_valid(regulators_node)) {
 		debug("%s: %s regulators subnode not found!\n", __func__,
@@ -418,7 +424,10 @@ static int rk8xx_probe(struct udevice *dev)
 	uint8_t on_source = 0, off_source = 0;
 	uint8_t power_en0, power_en1, power_en2, power_en3;
 	uint8_t value;
-
+#if TSAI
+	printf("rk8xx_probe \n");
+	//__asm("hlt #0");
+#endif
 	/* read Chip variant */
 	if (device_is_compatible(dev, "rockchip,rk817") ||
 	    device_is_compatible(dev, "rockchip,rk809")) {

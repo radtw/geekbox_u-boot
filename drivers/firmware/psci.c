@@ -6,7 +6,9 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
+#if TSAI
+#define DEBUG 1
+#endif
 #include <common.h>
 #include <dm.h>
 #include <dm/lists.h>
@@ -57,7 +59,6 @@ static int psci_bind(struct udevice *dev)
 static int psci_probe(struct udevice *dev)
 {
 	const char *method;
-
 	method = dev_read_prop(dev, "method", NULL);
 	if (!method) {
 		printf("missing \"method\" property\n");

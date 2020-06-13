@@ -1,5 +1,42 @@
 
 =========================================================
+
+write uboot.img by LBA
+'/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 8192 uboot.img
+'/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 16384 /home/julian/geekbox/rkbin/trust.img 
+
+
+=========================================================
+get rkbin
+it's not part of uboot, so build miniloader separately
+
+cd ~/geekbox/rkbin
+./tools/boot_merger ./RKBOOT/RK3368MINIALL.ini
+./tools/trust_merger ./RKTRUST/RK3368TRUST.ini
+
+these need to be flash to emmc
+~/geekbox/utils/upgrade_tool
+
+
+trust.img is meant to be written to 0x00004000
+WL 16384 /home/julian/geekbox/rkbin/trust.img
+
+https://github.com/rockchip-linux/rkbin
+rk3399: bl31: update version to v1.34
+
+Build from ATF commit:
+    af49f671 UPSTREAM: runtime_exceptions: Save x4-x29 unconditionally
+update feature:
+    af49f671 UPSTREAM: runtime_exceptions: Save x4-x29 unconditionally
+
+Signed-off-by: shengfei Xu <xsf@rock-chips.com>
+Change-Id: Ibcd4434af4844e36d9f4f0d45c0603768276bc03
+ master
+shengfei Xu
+shengfei Xu committed 25 days ago 
+1 parent de8675d commit ab3a4c7c697b2567f5f49e8474c2377818d53999
+
+=========================================================
 Based on https://github.com/rockchip-linux/u-boot
 
 commit 505eebf24e153630f5a3e0ec232ffda67bf48e9e (HEAD -> next-dev, origin/next-dev, origin/HEAD)

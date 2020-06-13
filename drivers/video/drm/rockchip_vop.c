@@ -201,6 +201,10 @@ static int rockchip_vop_init(struct display_state *state)
 	const struct rockchip_crtc *crtc = crtc_state->crtc;
 	const struct vop_data *vop_data = crtc->data;
 	struct vop *vop;
+#if TSAI
+	printf("rockchip_vop_init @%s\n", __FILE__);
+//	__asm("hlt #0");
+#endif
 	u16 hsync_len = mode->crtc_hsync_end - mode->crtc_hsync_start;
 	u16 hdisplay = mode->crtc_hdisplay;
 	u16 htotal = mode->crtc_htotal;
@@ -657,7 +661,9 @@ static int rockchip_vop_set_plane(struct display_state *state)
 	int crtc_h = crtc_state->crtc_h;
 	int xvir = crtc_state->xvir;
 	int x_mirror = 0, y_mirror = 0;
-
+#if TSAI
+	printf("rockchip_vop_set_plane %s %s\n", crtc_state->dev->name, conn_state->dev->name);
+#endif
 	act_info = (src_h - 1) << 16;
 	act_info |= (src_w - 1) & 0xffff;
 
@@ -720,6 +726,9 @@ static int rockchip_vop_set_plane(struct display_state *state)
 
 static int rockchip_vop_prepare(struct display_state *state)
 {
+#if TSAI
+	printf("rockchip_vop_prepare [empty] @%s\n", __FILE__);
+#endif
 	return 0;
 }
 
@@ -727,6 +736,9 @@ static int rockchip_vop_enable(struct display_state *state)
 {
 	struct crtc_state *crtc_state = &state->crtc_state;
 	struct vop *vop = crtc_state->private;
+#if TSAI
+	printf("rockchip_vop_enable %s \n", crtc_state->dev->name);
+#endif
 
 	VOP_CTRL_SET(vop, standby, 0);
 	vop_cfg_done(vop);

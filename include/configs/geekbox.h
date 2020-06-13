@@ -7,6 +7,10 @@
 #ifndef __CONFIGS_GEEKBOX_H
 #define __CONFIGS_GEEKBOX_H
 
+/*TSAI*/
+#define CONFIG_BOOTCOMMAND "bootrkp"
+
+
 #include <configs/rk3368_common.h>
 
 #if defined(CONFIG_CONSOLE_SCROLL_LINES)

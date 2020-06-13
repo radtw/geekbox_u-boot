@@ -386,6 +386,7 @@
 		"done\0"
 
 #ifndef CONFIG_BOOTCOMMAND
+
 #define CONFIG_BOOTCOMMAND "run distro_bootcmd"
 #endif
 

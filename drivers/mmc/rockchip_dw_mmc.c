@@ -176,6 +176,10 @@ static int rockchip_dwmmc_probe(struct udevice *dev)
 	struct dwmci_host *host = &priv->host;
 	struct udevice *pwr_dev __maybe_unused;
 	int ret;
+#if TSAI
+	printf("TSAI rockchip_dwmmc_probe @%s\n", __FILE__);
+//	__asm("hlt #0");
+#endif
 
 #ifdef CONFIG_SPL_BUILD
 	mmc_gpio_init_direct();

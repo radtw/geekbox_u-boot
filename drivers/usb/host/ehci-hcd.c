@@ -604,8 +604,10 @@ ehci_submit_async(struct usb_device *dev, unsigned long pipe, void *buffer,
 			ALIGN((unsigned long)buffer + length, ARCH_DMA_MINALIGN));
 
 	/* Check that the TD processing happened */
-	if (QT_TOKEN_GET_STATUS(token) & QT_TOKEN_STATUS_ACTIVE)
+	if (QT_TOKEN_GET_STATUS(token) & QT_TOKEN_STATUS_ACTIVE) {
 		printf("EHCI timed out on TD - token=%#x\n", token);
+		//__asm("hlt #0");
+	}
 
 	if (!(QT_TOKEN_GET_STATUS(qhtoken) & QT_TOKEN_STATUS_ACTIVE)) {
 		debug("TOKEN=%#x\n", qhtoken);

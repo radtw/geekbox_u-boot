@@ -604,6 +604,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		status = "disabled";
+		
 	};
 
 	i2c2: i2c@ff660000 {
@@ -937,7 +938,7 @@
 #if TSAI
 	//TSAI: vop is counterpart of geekbox 3.10 lcdc
 	vop: vop@ff930000 {
-		compatible = "rockchip,rk3368-vop";
+		compatible = "rockchip,rk3368-vop","rockchip,rk3288-vop";
 		rockchip,grf = <&grf>;
 		reg = <0x0 0xff930000 0x0 0x2fc>, <0x0 0xff931000 0x0 0x400>;
 		reg-names = "regs", "gamma_lut";
@@ -962,6 +963,26 @@
 
 		};
 	};
+	
+
+	//copied from rk3288.dtsi, to make rockchip_display.c probe being called
+	display_subsystem: display-subsystem {
+		compatible = "rockchip,display-subsystem";
+		ports = <&vop_out>;
+		status = "disabled";
+
+		route {
+			route_hdmi: route-hdmi {
+				status = "disabled";
+				logo,uboot = "logo.bmp";
+				logo,kernel = "logo_kernel.bmp";
+				logo,mode = "center";
+				charge_logo,mode = "center";
+				connect = <&vop_out_hdmi>;
+			};
+		};
+	};
+		
 	//TSAI: I want hdmi output in u-boot
 	hdmi: hdmi@ff980000 {
 		compatible = "rockchip,rk3368-dw-hdmi";
@@ -986,6 +1007,8 @@
 			};
 		};
 	};
+
+
 
 #endif
 	gic: interrupt-controller@ffb71000 {

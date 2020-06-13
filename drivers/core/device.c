@@ -8,7 +8,9 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
+#if TSAI
+#define DEBUG 1
+#endif
 #include <common.h>
 #include <asm/io.h>
 #include <clk.h>
@@ -189,8 +191,12 @@ static int device_bind_common(struct udevice *parent, const struct driver *drv,
 	/* if we fail to bind we remove device from successors and free it */
 	if (drv->bind) {
 		ret = drv->bind(dev);
-		if (ret)
+		if (ret) {
+#if TSAI
+		printf("TSAI:dev %s drv %s fail to bind\n", dev->name, drv->name);
+#endif
 			goto fail_bind;
+		}
 	}
 	if (parent && parent->driver->child_post_bind) {
 		ret = parent->driver->child_post_bind(dev);

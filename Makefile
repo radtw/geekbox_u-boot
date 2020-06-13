@@ -721,6 +721,7 @@ libs-y += test/dm/
 libs-$(CONFIG_UT_ENV) += test/env/
 libs-$(CONFIG_UT_OVERLAY) += test/overlay/
 
+#$(info BOARDDIR=$(BOARDDIR))
 libs-y += $(if $(BOARDDIR),board/$(BOARDDIR)/)
 
 libs-y := $(sort $(libs-y))
@@ -997,6 +998,19 @@ OBJCOPYFLAGS_u-boot.ldr.srec := -I binary -O srec
 
 u-boot.ldr.hex u-boot.ldr.srec: u-boot.ldr FORCE
 	$(call if_changed,objcopy)
+
+#TSAI: this section is coped from geekbox uboot, to enable building miniloader
+$(info CONFIG_TARGET_GEEKBOX=$(CONFIG_TARGET_GEEKBOX))
+ifdef CONFIG_TARGET_GEEKBOX
+    #TSAI: if SPL not used, I think it means it's second level bootloader??
+    ifndef CONFIG_SPL
+    SECOND_LEVEL_BOOTLOADER = y
+    endif
+    ifdef SECOND_LEVEL_BOOTLOADER
+        uboot.img: u-boot-dtb.bin
+	        ./tools/loaderimage --pack --uboot u-boot-dtb.bin uboot.img
+    endif # SECOND_LEVEL_BOOTLOADER
+endif # CONFIG_ROCKCHIP
 
 #
 # U-Boot entry point, needed for booting of full-blown U-Boot

@@ -180,22 +180,51 @@ static int boot_from_udisk(void)
 		return 0;
 
 	if (!run_command("usb start", -1)) {
-//		__asm("hlt #0");
+#if TSAI
+		/* go through each USB devices not just first one*/
+		int i;
+		char usbcmd[32];
+		for (i=0; ; i++) {
+			desc = blk_get_devnum_by_type(IF_TYPE_USB, i);
+			if (!desc) {
+				printf("No usb[%d] device found\n", i);
+				return -ENODEV;
+			}
+			snprintf(usbcmd, sizeof(usbcmd), "rkimgtest usb %d", i);
+			if (!run_command(usbcmd, -1)) {
+				/* if calling rockchip_set_bootdev(desc); it will not update kernel bootargs, so clear it to force it refresh*/
+				rockchip_set_bootdev(NULL);
+				env_set("devtype", "usb");
+				sprintf(usbcmd, "%d", i);
+				env_set("devnum", usbcmd);
+				printf("Boot from usb %d devtype=usb devnum=%d @%s\n", i, i,__FILE__);
+				if (rockchip_get_bootdev() != desc) {
+					printf("ERROR: refreshing booting device doesn't succeed @%s\n", __FILE__);
+					__asm("hlt #0");
+				}
+
+				break;
+			}
+			else {
+				//__asm("hlt #0");
+			}
+		}
+#else
 		desc = blk_get_devnum_by_type(IF_TYPE_USB, 0);
 		if (!desc) {
 			printf("No usb device found\n");
 			return -ENODEV;
 		}
-
 		if (!run_command("rkimgtest usb 0", -1)) {
 			rockchip_set_bootdev(desc);
 			env_set("devtype", "usb");
 			env_set("devnum", "0");
-			printf("Boot from usb 0\n");
+			printf("Boot from usb 0 devtype=usb devnum=0 @%s\n", __FILE__);
 		} else {
 			printf("No usb dev 0 found\n");
 			return -ENODEV;
 		}
+#endif
 	}
 
 	return 0;

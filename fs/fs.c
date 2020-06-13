@@ -274,6 +274,9 @@ int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype)
 					&fs_partition, 1);
 	if (part < 0)
 		return -1;
+#if TSAI
+	printf("ifname=%s dev_part_str=%s part =%s @%s\n", ifname, dev_part_str, fs_partition.name, __FILE__);
+#endif
 
 	for (i = 0, info = fstypes; i < ARRAY_SIZE(fstypes); i++, info++) {
 		if (fstype != FS_TYPE_ANY && info->fstype != FS_TYPE_ANY &&

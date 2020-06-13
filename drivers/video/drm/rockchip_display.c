@@ -535,6 +535,13 @@ static int display_init(struct display_state *state)
 	if (state->is_init)
 		return 0;
 
+#if TSAI
+	printf("TSAI: display_init dev=%s conn=%s @%s\n",
+			state->crtc_state.dev->name, state->conn_state.dev->name,
+			__FILE__);
+
+#endif
+
 	if (!conn_funcs || !crtc_funcs) {
 		printf("failed to find connector or crtc functions\n");
 		return -ENXIO;
@@ -554,15 +561,21 @@ static int display_init(struct display_state *state)
 
 	if (panel_state->panel)
 		rockchip_panel_init(panel_state->panel);
+	else
+		printf("no panel\n");
 
 	if (conn_funcs->init) {
 		ret = conn_funcs->init(state);
-		if (ret)
+		if (ret) {
+			printf("conn_funcs->init ret=%d\n", ret);
 			goto deinit;
+		}
 	}
 
 	if (conn_state->phy)
 		rockchip_phy_init(conn_state->phy);
+	else
+		printf("no conn_state->phy\n");
 
 	/*
 	 * support hotplug, but not connect;
@@ -584,8 +597,10 @@ static int display_init(struct display_state *state)
 		if (conn_state->type == DRM_MODE_CONNECTOR_HDMIA)
 			crtc->hdmi_hpd = ret;
 #endif
-		if (!ret)
+		if (!ret) {
+			printf("TSAI: HDMI not connected\n");
 			goto deinit;
+		}
 	}
 
 	if (panel_state->panel) {
@@ -633,8 +648,10 @@ static int display_init(struct display_state *state)
 	return 0;
 
 deinit:
-	if (conn_funcs->deinit)
+	printf("deinit\n");
+	if (conn_funcs->deinit) {
 		conn_funcs->deinit(state);
+	}
 	return ret;
 }
 
@@ -770,10 +787,16 @@ static int display_logo(struct display_state *state)
 	struct connector_state *conn_state = &state->conn_state;
 	struct logo_info *logo = &state->logo;
 	int hdisplay, vdisplay, ret;
-
+#if TSAI
+	printf("TSAI: display_logo dev=%s conn=%s @%s\n",
+			crtc_state->dev->name, conn_state->dev->name,
+			__FILE__);
+#endif
 	ret = display_init(state);
-	if (!state->is_init || ret)
+	if (!state->is_init || ret) {
+		printf("display_init() ret=%d\n", ret);
 		return -ENODEV;
+	}
 
 	switch (logo->bpp) {
 	case 16:
@@ -823,7 +846,11 @@ static int display_logo(struct display_state *state)
 			crtc_state->crtc_h = crtc_state->src_h;
 		}
 	}
-
+#if TSAI
+	printf("display_logo showing image %dx%d bpp %d at 0x%x\n", crtc_state->crtc_w, crtc_state->crtc_h,
+			logo->bpp, crtc_state->dma_addr );
+//	__asm("hlt #0");
+#endif
 	display_set_plane(state);
 	display_enable(state);
 
@@ -1092,7 +1119,8 @@ int rockchip_show_logo(void)
 	struct display_state *s;
 	int ret = 0;
 #if TSAI
-	printf("TSAI rockchip_show_logo\n");
+	printf("TSAI rockchip_show_logo @%s\n", __FILE__);
+	//__asm("hlt #0");
 #endif
 	list_for_each_entry(s, &rockchip_display_list, head) {
 		s->logo.mode = s->logo_mode;
@@ -1106,6 +1134,29 @@ int rockchip_show_logo(void)
 
 	return ret;
 }
+
+#if TSAI && defined(CONFIG_TARGET_GEEKBOX)
+//rockchip_display_probe() will update rockchip_display_list
+
+int tsai_geekbox_probe_display(void) {
+	int ret;
+	struct udevice* pdev = NULL;
+	int totalprobed = 0;
+	printf("TSAI: tsai_geekbox_probe_display[in] workaround for geekbox, force probe@%s\n", __FILE__);
+
+	ret = uclass_first_device_check(UCLASS_VIDEO, &pdev);
+	while (ret==0 && pdev) {
+		if (pdev) {
+			printf("DONE probe[%d] for %s \n", totalprobed, pdev->name);
+			totalprobed++;
+		}
+		ret = uclass_next_device_check(&pdev);
+	}
+	printf("TSAI: tsai_geekbox_probe_display[out] totalprobed=%d \n", totalprobed);
+	return 0;
+}
+
+#endif
 
 enum {
 	PORT_DIR_IN,
@@ -1290,7 +1341,9 @@ static int rockchip_display_probe(struct udevice *dev)
 	ofnode node, route_node;
 	struct device_node *port_node, *vop_node, *ep_node;
 	struct public_phy_data *data;
-
+#if TSAI
+	printf("TSAI:rockchip_display_probe @%s\n", __FILE__);
+#endif
 	/* Before relocation we don't need to do anything */
 	if (!(gd->flags & GD_FLG_RELOC))
 		return 0;
@@ -1380,6 +1433,8 @@ static int rockchip_display_probe(struct udevice *dev)
 		else
 			s->charge_logo_mode = ROCKCHIP_DISPLAY_CENTER;
 
+		//__asm("hlt #0");
+
 		s->blob = blob;
 		s->panel_state.panel = panel;
 		s->conn_state.node = conn_dev->node;
@@ -1420,6 +1475,9 @@ static int rockchip_display_probe(struct udevice *dev)
 			continue;
 		}
 		list_add_tail(&s->head, &rockchip_display_list);
+		printf("TSAI: Add %s to rockchip_display_list klogo=%s\n",
+				s->crtc_state.dev ? s->crtc_state.dev-> name: "UNKNOWN",
+				s->klogo_name);
 	}
 
 	if (list_empty(&rockchip_display_list)) {
@@ -1533,7 +1591,9 @@ void rockchip_display_fixup(void *blob)
 int rockchip_display_bind(struct udevice *dev)
 {
 	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
-
+#if TSAI
+	printf("rockchip_display_bind @%s\n", __FILE__);
+#endif
 	plat->size = DRM_ROCKCHIP_FB_SIZE + MEMORY_POOL_SIZE;
 
 	return 0;

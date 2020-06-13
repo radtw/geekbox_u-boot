@@ -56,6 +56,9 @@ static const char * const rk3288_regulator_names[] = {
 
 static int rk3288_vop_probe(struct udevice *dev)
 {
+#if TSAI
+	printf("rk3288_vop_probe @%s\n", __FILE__);
+#endif
 	/* Before relocation we don't need to do anything */
 	if (!(gd->flags & GD_FLG_RELOC))
 		return 0;

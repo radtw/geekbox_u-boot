@@ -6,7 +6,6 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
 #include <common.h>
 #include <errno.h>
 #include <dm/device.h>
@@ -17,6 +16,12 @@
 #include <dm/util.h>
 #include <fdtdec.h>
 #include <linux/compiler.h>
+#if 0 && TSAI
+#define DEBUG 1
+#undef pr_debug
+#define pr_debug printf
+#endif
+
 
 struct driver *lists_driver_lookup_name(const char *name)
 {
@@ -140,7 +145,9 @@ int lists_bind_fdt(struct udevice *parent, ofnode node, struct udevice **devp)
 		*devp = NULL;
 	name = ofnode_get_name(node);
 	pr_debug("bind node %s\n", name);
-
+#if 0 && TSAI
+	__asm("hlt #0");
+#endif
 	compat_list = ofnode_get_property(node, "compatible", &compat_length);
 	if (!compat_list) {
 		if (compat_length == -FDT_ERR_NOTFOUND) {

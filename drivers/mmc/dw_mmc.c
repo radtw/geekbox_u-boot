@@ -657,7 +657,9 @@ static int dwmci_get_cd(struct udevice *dev)
 int dwmci_probe(struct udevice *dev)
 {
 	struct mmc *mmc = mmc_get_mmc_dev(dev);
-
+#if TSAI
+	printf("TSAI dwmci_probe @%s\n", __FILE__);
+#endif
 	return dwmci_init(mmc);
 }
 

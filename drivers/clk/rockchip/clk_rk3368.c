@@ -91,7 +91,8 @@ static struct rockchip_cpu_rate_table rk3368_cpu_rates[] = {
 		       (_nr * _no) == hz, #hz "Hz cannot be hit with PLL " \
 		       "divisors on line " __stringify(__LINE__));
 
-#if IS_ENABLED(CONFIG_SPL_BUILD) || IS_ENABLED(CONFIG_TPL_BUILD)
+//TSAI: see if it can get vop hdmi register initialized?
+#if IS_ENABLED(CONFIG_SPL_BUILD) || IS_ENABLED(CONFIG_TPL_BUILD) || (TSAI && defined(CONFIG_TARGET_GEEKBOX))
 static const struct pll_div apll_l_init_cfg = PLL_DIVISORS(APLL_L_HZ, 12, 2);
 static const struct pll_div apll_b_init_cfg = PLL_DIVISORS(APLL_B_HZ, 1, 2);
 #if !defined(CONFIG_TPL_BUILD)
@@ -961,7 +962,7 @@ static ulong rk3368_clk_set_rate(struct clk *clk, ulong rate)
 	struct pll_div pll_config = {0};
 	u32 pll_div;
 	ulong ret = 0;
-
+//__asm("hlt #0");
 	switch (clk->id) {
 	case PLL_APLLB:
 	case PLL_APLLL:
@@ -1223,7 +1224,7 @@ static struct clk_ops rk3368_clk_ops = {
 #endif
 };
 
-#if IS_ENABLED(CONFIG_SPL_BUILD) || IS_ENABLED(CONFIG_TPL_BUILD)
+#if IS_ENABLED(CONFIG_SPL_BUILD) || IS_ENABLED(CONFIG_TPL_BUILD) || defined(CONFIG_TARGET_GEEKBOX)
 static void rkclk_init(struct rk3368_cru *cru)
 {
 	u32 apllb, aplll, dpll, cpll, gpll;
@@ -1259,13 +1260,18 @@ static int rk3368_clk_probe(struct udevice *dev)
 
 	priv->cru = map_sysmem(plat->dtd.reg[0], plat->dtd.reg[1]);
 #endif
+	printf("rk3368_clk_probe @%s\n", __FILE__);
+
 	priv->sync_kernel = false;
 	if (!priv->armlclk_enter_hz)
 		priv->armlclk_enter_hz = rkclk_pll_get_rate(priv->cru, APLLL);
 	if (!priv->armbclk_enter_hz)
 		priv->armbclk_enter_hz = rkclk_pll_get_rate(priv->cru, APLLB);
-#if IS_ENABLED(CONFIG_SPL_BUILD) || IS_ENABLED(CONFIG_TPL_BUILD)
+#if IS_ENABLED(CONFIG_SPL_BUILD) || IS_ENABLED(CONFIG_TPL_BUILD) || (1 && defined(CONFIG_TARGET_GEEKBOX))
 	rkclk_init(priv->cru);
+	printf("TSAI: calling rkclk_init() to enable VOP/HMDI registers\n");
+#else
+	(void)rkclk_init;
 #endif
 	rkclk_set_pll(priv->cru, NPLL, &npll_init_cfg);
 	if (!priv->armlclk_init_hz)

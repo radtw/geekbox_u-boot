@@ -1183,6 +1183,12 @@ retry_it:
 		srb->datalen = block_dev->blksz * smallblks;
 		srb->pdata = (unsigned char *)buf_addr;
 		if (usb_read_10(srb, ss, start, smallblks)) {
+#if TSAI && CONFIG_TARGET_GEEKBOX /* if this device is geekbox JMicron ATA 2 USB, then timeout will happen if no ATA device*/
+			if (ss->pusb_dev && strcmp(ss->pusb_dev->mf,"JMicron")==0) {
+				printf("TSAI: geekbox JMicron timeout when no ATA device available, ignore @%s\n", __FILE__);
+				break;
+			}
+#endif
 			debug("Read ERROR\n");
 			usb_request_sense(srb, ss);
 			if (retry--)

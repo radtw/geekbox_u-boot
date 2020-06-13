@@ -36,7 +36,11 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+#if TSAI
+static void boot_devtype_init(bool forceRefresh)
+#else
 static void boot_devtype_init(void)
+#endif
 {
 	const char *devtype_num_set = "run rkimg_bootdev";
 	char *devtype = NULL, *devnum = NULL;
@@ -44,6 +48,9 @@ static void boot_devtype_init(void)
 	int atags_en = 0;
 	int ret;
 
+#if TSAI
+	if (!forceRefresh)
+#endif
 	if (done)
 		return;
 
@@ -105,7 +112,9 @@ static int get_bootdev_type(void)
 		devtype = "mmc";
 		printf("Use emmc as default boot media\n");
 	}
-
+#if 0 && TSAI
+	__asm("hlt #0");
+#endif
 	if (!strcmp(devtype, "mmc")) {
 		type = IF_TYPE_MMC;
 		if (devnum == 1)
@@ -127,12 +136,23 @@ static int get_bootdev_type(void)
 	} else if (!strcmp(devtype, "mtd")) {
 		type = IF_TYPE_MTD;
 		boot_media = "mtd";
+#if TSAI /* for USB ums boot! */
+	} else if (!strcmp(devtype, "usb")) {
+		type = IF_TYPE_USB;
+		boot_media = "ums";
+		printf("TSAI: boot from USB, pass UMS to kernel @%s\n", __FILE__);
+#endif
 	} else {
 		/* Add new to support */
 	}
-
+#if TSAI
+	/* in the case of USB boot, it will set to emmc first and then usb, so 2nd time need to be refreshed as well */
+	if (boot_media) {
+		(void)appended;
+#else
 	if (!appended && boot_media) {
 		appended = 1;
+#endif
 
 	/*
 	 * The legacy rockchip Android (SDK < 8.1) requires "androidboot.mode="
@@ -183,6 +203,9 @@ static int get_bootdev_type(void)
 				 boot_media, boot_media);
 #endif
 		env_update("bootargs", boot_options);
+#if TSAI
+		printf("TSAI:Updated bootargs=%s \n", boot_options);
+#endif
 	}
 
 	return type;
@@ -194,15 +217,33 @@ struct blk_desc *rockchip_get_bootdev(void)
 {
 	int dev_type;
 	int devnum;
-
+#if TSAI /* no longer valid, eg. when USB deinit */
+	if (dev_desc->if_type >= IF_TYPE_COUNT) {
+		dev_desc = NULL;
+	}
+#endif
 	if (dev_desc)
 		return dev_desc;
-
+#if TSAI
+	boot_devtype_init(false);
+#else
 	boot_devtype_init();
+#endif
+#if TSAI
+RetryMMC:
+#endif
 	dev_type = get_bootdev_type();
 	devnum = env_get_ulong("devnum", 10, 0);
 
 	dev_desc = blk_get_devnum_by_type(dev_type, devnum);
+#if TSAI
+	if (!dev_desc && dev_type != IF_TYPE_MMC) {
+		env_set("devtype", "mmc");
+		printf("TSAI: dev_desc is NULL, reset to use MMC for a second chance\n");
+		__asm("hlt #0");
+		goto RetryMMC;
+	} else
+#endif
 	if (!dev_desc) {
 		printf("%s: Can't find dev_desc!\n", __func__);
 		return NULL;
@@ -263,7 +304,9 @@ __weak int rockchip_dnl_key_pressed(void)
 		printf("%s: Failed to read saradc, ret=%d\n", __func__, ret);
 		return 0;
 	}
-
+#if TSAI
+	printf("TSAI: key pressed=%d @%s\n", val, __FILE__);
+#endif
 	return ((val >= KEY_DOWN_MIN_VAL) && (val <= KEY_DOWN_MAX_VAL));
 #endif
 
@@ -272,7 +315,11 @@ __weak int rockchip_dnl_key_pressed(void)
 
 void setup_download_mode(void)
 {
+#if TSAI
+	boot_devtype_init(false);
+#else
 	boot_devtype_init();
+#endif
 
 	/* recovery key or "ctrl+d" */
 	if (rockchip_dnl_key_pressed() || is_hotkey(HK_ROCKUSB_DNL)) {

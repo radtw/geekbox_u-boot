@@ -231,6 +231,10 @@ static int rk_display_init(struct udevice *dev, ulong fbbase, int ep_node)
 	struct display_plat *disp_uc_plat;
 	struct clk clk;
 	enum video_log2_bpp l2bpp;
+#if TSAI
+	printf("rk_display_init @%s\n", __FILE__);
+#endif
+
 
 	vop_id = fdtdec_get_int(blob, ep_node, "reg", -1);
 	debug("vop_id=%d\n", vop_id);
@@ -338,6 +342,9 @@ int rk_vop_probe(struct udevice *dev)
 	struct rk_vop_priv *priv = dev_get_priv(dev);
 	int ret = 0;
 	int port, node;
+#if TSAI
+	printf("rk_vop_probe @%s\n", __FILE__);
+#endif
 
 	/* Before relocation we don't need to do anything */
 	if (!(gd->flags & GD_FLG_RELOC))
@@ -373,7 +380,9 @@ int rk_vop_probe(struct udevice *dev)
 int rk_vop_bind(struct udevice *dev)
 {
 	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
-
+#if TSAI
+	printf("rk_vop_bind @%s\n", __FILE__);
+#endif
 	plat->size = 4 * (CONFIG_VIDEO_ROCKCHIP_MAX_XRES *
 			  CONFIG_VIDEO_ROCKCHIP_MAX_YRES);
 

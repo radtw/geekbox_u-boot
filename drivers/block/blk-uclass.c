@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-#if TSAI
+#if 0 && TSAI
 #define DEBUG 1
 #endif
 #include <common.h>

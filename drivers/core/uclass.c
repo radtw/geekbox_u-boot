@@ -6,7 +6,9 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
+#if TSAI
+#define DEBUG 1
+#endif
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
@@ -56,6 +58,7 @@ static int uclass_add(enum uclass_id id, struct uclass **ucp)
 	struct uclass_driver *uc_drv;
 	struct uclass *uc;
 	int ret;
+//__asm("hlt #0");
 
 	*ucp = NULL;
 	uc_drv = lists_uclass_lookup(id);
@@ -571,7 +574,34 @@ int uclass_bind_device(struct udevice *dev)
 
 	uc = dev->uclass;
 	list_add_tail(&dev->uclass_node, &uc->dev_head);
+#if 0 && TSAI
+	if ((long)gd > 0x500000)
+	{
+		const char* classname = "";
+		const char* drvname = "";
+		const char* npname = "";
+		const struct device_node* np = dev->node.np;
 
+		if (dev->uclass && dev->uclass->uc_drv)
+			classname = dev->uclass->uc_drv->name;
+		if (dev->driver) {
+			drvname = dev->driver->name;
+
+			if (dev->driver->id == UCLASS_PMIC)
+				__asm("hlt #0");
+		}
+		{
+			if (np && !IS_ERR(np) &&
+					(PTR_ERR(np) > (gd->start_addr_sp))
+			)
+				npname= np->full_name;
+		}
+
+		printf("uclass_bind_device dev=%s %s drv=%s class=%s\n",
+				dev->name, npname, drvname, classname);
+	//__asm("hlt #0");
+	}
+#endif
 	if (dev->parent) {
 		struct uclass_driver *uc_drv = dev->parent->uclass->uc_drv;
 

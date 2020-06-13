@@ -108,6 +108,7 @@
 		regulator-always-on;
 		regulator-boot-on;
 	};
+
 };
 
 &emmc {
@@ -140,7 +141,9 @@
 
 &i2c0 {
 	status = "okay";
-
+#if TSAI
+	//20200614: if I put it under i2c0, then it won't be found by uclass_bind_device().
+	//don't know what to do?
 	rk808: pmic@1b {
 		compatible = "rockchip,rk808";
 		reg = <0x1b>;
@@ -270,6 +273,7 @@
 			};
 		};
 	};
+#endif			
 };
 
 &pinctrl {
@@ -294,6 +298,11 @@
 			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
+};
+
+//TSAI: this is for download key in boot loader
+&saradc {
+	status = "okay";
 };
 
 &tsadc {
@@ -332,8 +341,18 @@
 	status = "okay";
 };
 
+&vop {
+	status = "okay";
+};
+
 &hdmi {
 	status = "okay";
 };
 
+&display_subsystem {
+	status = "okay";
+};
+&route_hdmi {
+	status = "okay";
+};
 #endif

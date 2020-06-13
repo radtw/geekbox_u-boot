@@ -2381,6 +2381,6 @@ fail:
 	printf("Failed to mount ext2 filesystem...\n");
 	free(data);
 	ext4fs_root = NULL;
-
+//__asm("hlt #0");
 	return 0;
 }

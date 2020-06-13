@@ -11,7 +11,9 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
+#if TSAI
+	#define DEBUG
+#endif
 #include <common.h>
 #include <command.h>
 #include <dm.h>
@@ -225,7 +227,9 @@ static void do_nonsec_virt_switch(void)
 static void boot_prep_linux(bootm_headers_t *images)
 {
 	char *commandline = env_get("bootargs");
-
+#if TSAI
+	printf("boot_prep_linux bootargs=%s @%s\n", commandline, __FILE__);
+#endif
 	if (IMAGE_ENABLE_OF_LIBFDT && images->ft_len) {
 #ifdef CONFIG_OF_LIBFDT
 		debug("using: FDT\n");
@@ -327,7 +331,7 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 	kernel_entry = (void (*)(void *fdt_addr, void *res0, void *res1,
 				void *res2))images->ep;
 
-	debug("## Transferring control to Linux (at address %lx)...\n",
+	printf("## Transferring control to Linux (at address %lx)...\n",
 		(ulong) kernel_entry);
 	bootstage_mark(BOOTSTAGE_ID_RUN_OS);
 
@@ -338,8 +342,8 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 		armv8_setup_psci();
 #endif
 		do_nonsec_virt_switch();
-
 		update_os_arch_secondary_cores(images->os.arch);
+		printf("TSAI: next instruction is jump to kernel entry \n");
 
 #ifdef CONFIG_ARMV8_SWITCH_TO_EL1
 		armv8_switch_to_el2((u64)images->ft_addr, 0, 0, 0,
@@ -351,10 +355,12 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 					    (u64)images->ft_addr, 0,
 					    (u64)images->ep,
 					    ES_TO_AARCH32);
-		else
+		else {
+			//__asm("hlt #0");
 			armv8_switch_to_el2((u64)images->ft_addr, 0, 0, 0,
 					    images->ep,
 					    ES_TO_AARCH64);
+		}
 #endif
 	}
 #else

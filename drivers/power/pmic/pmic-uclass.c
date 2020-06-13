@@ -4,6 +4,8 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
+//#define DEBUG 1
+//#pragma GCC optimize ("O0")
 
 #include <common.h>
 #include <fdtdec.h>

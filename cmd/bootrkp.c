@@ -242,7 +242,7 @@ static int boot_rockchip_image(struct blk_desc *dev_desc,
 	int fdt_size;
 	int ret;
 
-	printf("\n## Booting Rockchip Format Image\n");
+	printf("\n## Booting Rockchip Format Image @%s\n", __FILE__);
 
 	ramdisk_addr_r = env_get_ulong("ramdisk_addr_r", 16, 0);
 	kernel_addr_r = env_get_ulong("kernel_addr_r", 16, 0);
@@ -324,12 +324,17 @@ static int do_boot_rockchip(cmd_tbl_t *cmdtp, int flag,
 	struct blk_desc *dev_desc;
 	disk_partition_t part;
 	int ret;
-
+#if TSAI
+//__asm("hlt #0");
+#endif
 	dev_desc = rockchip_get_bootdev();
 	if (!dev_desc) {
 		printf("dev_desc is NULL!\n");
 		return CMD_RET_FAILURE;
 	}
+#if TSAI
+	printf("TSAI: dev_desc vendor=%s product=%s\n", dev_desc->vendor, dev_desc->product);
+#endif
 
 #ifdef CONFIG_ANDROID_KEYMASTER_CA
 	/* load attestation key from misc partition. */

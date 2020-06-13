@@ -34,6 +34,9 @@ static int do_rkimg_test(cmd_tbl_t *cmdtp, int flag,
 
 	if (buffer[0] == 0xFCDC8C3B) {
 		ret = CMD_RET_SUCCESS;
+#if TSAI
+		printf("TSAI: found 0xFCDC8C3B at LBA 64\n");
+#endif
 
 		if (!strcmp("mmc", argv[1]))
 			printf("Found IDB in SDcard\n");

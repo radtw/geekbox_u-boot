@@ -2224,6 +2224,9 @@ static void dw_hdmi_i2c_set_divs(struct dw_hdmi *hdmi)
 
 static void dw_hdmi_i2c_init(struct dw_hdmi *hdmi)
 {
+#if TSAI
+	printf("dw_hdmi_i2c_init\n");
+#endif
 	/* Software reset */
 	hdmi_writeb(hdmi, 0x00, HDMI_I2CM_SOFTRSTZ);
 
@@ -2272,7 +2275,9 @@ int rockchip_dw_hdmi_init(struct display_state *state)
 	struct drm_display_mode *mode_buf;
 	ofnode hdmi_node = conn_state->node;
 	u32 val;
-
+#if TSAI
+	printf("rockchip_dw_hdmi_init \n");
+#endif
 	hdmi = malloc(sizeof(struct dw_hdmi));
 	if (!hdmi)
 		return -ENOMEM;
@@ -2370,6 +2375,9 @@ int rockchip_dw_hdmi_enable(struct display_state *state)
 	struct connector_state *conn_state = &state->conn_state;
 	struct drm_display_mode *mode = &conn_state->mode;
 	struct dw_hdmi *hdmi = conn_state->private;
+#if TSAI
+	printf("rockchip_dw_hdmi_enable \n");
+#endif
 
 	if (!hdmi)
 		return -EFAULT;
@@ -2469,7 +2477,10 @@ int rockchip_dw_hdmi_detect(struct display_state *state)
 	int ret;
 	struct connector_state *conn_state = &state->conn_state;
 	struct dw_hdmi *hdmi = conn_state->private;
-
+#if TSAI
+	printf("rockchip_dw_hdmi_detect \n");
+//	__asm("hlt #0");
+#endif
 	if (!hdmi)
 		return -EFAULT;
 
@@ -2483,6 +2494,9 @@ int rockchip_dw_hdmi_get_edid(struct display_state *state)
 	int ret;
 	struct connector_state *conn_state = &state->conn_state;
 	struct dw_hdmi *hdmi = conn_state->private;
+#if TSAI
+	printf("rockchip_dw_hdmi_get_edid \n");
+#endif
 
 	ret = drm_do_get_edid(&hdmi->adap, conn_state->edid);
 
