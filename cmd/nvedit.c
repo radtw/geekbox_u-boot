@@ -539,7 +539,13 @@ int env_update(const char *varname, const char *varvalue)
 	return env_update_filter(varname, varvalue, NULL);
 }
 
+#if TSAI
+//To be backward compatible, there is long parameter like
+//mtdparts=rk29xxnand:0x00002000@0x00002000(uboot),0x00002000@0x00004000(trust),0x00002000@0x00006000(misc),0x00008000@0x00008000(resource),0x00008000@0x00010000(kernel),0x00010000@0x00018000(boot),0x00010000@0x00028000(recovery),0x00038000@0x00038000(backup),0x00040000@0x00070000(cache),0x00002000@0x000B0000(kpanic),0x00200000@0x000B2000(system),0x00008000@0x002B2000(metadata),0x00002000@0x002BA000(baseparamer),0x00400000@0x002BC000(userdata),0x00010000@0x006BC000(ramfs),0x01134000@0x006CC000(user),-@0x01800000(linuxroot)
+#define VARVALUE_BUF_SIZE	1024
+#else
 #define VARVALUE_BUF_SIZE	512
+#endif
 
 char *env_exist(const char *varname, const char *varvalue)
 {

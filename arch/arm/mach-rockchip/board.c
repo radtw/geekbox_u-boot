@@ -164,6 +164,11 @@ int fb_set_reboot_flag(void)
 #endif
 
 #ifdef CONFIG_ROCKCHIP_USB_BOOT
+
+#if TSAI && defined(CONFIG_TARGET_GEEKBOX)
+extern int rkparm_partition_parse(char *param, struct blk_desc *dev_desc);
+#endif
+
 static int boot_from_udisk(void)
 {
 	struct blk_desc *desc;
@@ -200,7 +205,28 @@ static int boot_from_udisk(void)
 				printf("Boot from usb %d devtype=usb devnum=%d @%s\n", i, i,__FILE__);
 				if (rockchip_get_bootdev() != desc) {
 					printf("ERROR: refreshing booting device doesn't succeed @%s\n", __FILE__);
-					__asm("hlt #0");
+					//__asm("hlt #0");
+				}
+
+				{
+					//TSAI find a partition named "RKPARM" and parse to be backward compatible
+					disk_partition_t info;
+					int partno;
+					//__asm("hlt #0");
+					partno = part_get_info_by_name(desc, "RKPARM", &info );
+					if (partno > 0) {
+						long ret;
+						char* buf;
+						int byteSize;
+						byteSize = (info.size > 16?16:info.size) * info.blksz;
+						buf = malloc(byteSize);
+						printf("TSAI: RKPARM parition[%d] found, parse its parameter @%s\n", partno, __FILE__);
+
+						ret = blk_dread(desc, info.start, 16, buf);
+						if (ret > 0)
+							rkparm_partition_parse(buf, desc);
+						free(buf);
+					}
 				}
 
 				break;

@@ -32,6 +32,32 @@ static void probe_pmic(void) {
 	return;
 }
 
+//TSAI: for backward compatibility
+int rkparm_partition_parse(char *param, struct blk_desc *dev_desc)
+{
+	const char *cmdline = strstr(param, "CMDLINE:");
+	//const char *blkdev_parts;
+	char *cmdline_end;
+//__asm("hlt #0");
+	if (!cmdline) {
+		debug("RKPARM: Invalid parameter part table from storage\n");
+		return -EINVAL;
+	}
+
+	//blkdev_parts = strstr(cmdline, "mtdparts");
+	cmdline_end = strstr(cmdline, "\n"); /* end by '\n' */
+	*cmdline_end = '\0';
+	/*
+	 * 1. skip "CMDLINE:"
+	 * 2. Initrd fixup: remove unused "initrd=0x...,0x...", this for
+	 *    compatible with legacy parameter.txt
+	 */
+	env_update_filter("bootargs", cmdline + strlen("CMDLINE:"), "initrd=");
+	//env_append("bootargs", cmdline + strlen("CMDLINE:") );
+	printf("TSAI: rkparm_partition_parse @%s\n", __FILE__);
+	return 0;
+}
+
 #if 0
 static void probe_regulators(void) {
 	int ret;

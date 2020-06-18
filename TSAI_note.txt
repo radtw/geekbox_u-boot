@@ -2,8 +2,8 @@
 =========================================================
 
 write uboot.img by LBA
-'/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 8192 uboot.img
 '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 16384 /home/julian/geekbox/rkbin/trust.img 
+'/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 8192 uboot.img
 
 
 =========================================================
