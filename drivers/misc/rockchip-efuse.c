@@ -233,7 +233,7 @@ static int rockchip_rk3288_efuse_read(struct udevice *dev, int offset,
 	if (size > (max_size - offset))
 		size = max_size - offset;
 
-__asm("hlt #0");
+//__asm("hlt #0");
 	/* Switch to read mode */
 	writel(RK3288_LOAD | RK3288_PGENB, &efuse->ctrl);
 	udelay(1);

@@ -279,7 +279,21 @@ static int boot_rockchip_image(struct blk_desc *dev_desc,
 	printf("fdt	 @ 0x%08lx (0x%08x)\n", fdt_addr_r, fdt_totalsize(fdt_addr_r));
 	printf("kernel   @ 0x%08lx (0x%08x)\n", kernel_addr_r, kernel_size);
 	printf("ramdisk  @ 0x%08lx (0x%08x)\n", ramdisk_addr_r, ramdisk_size);
-
+#if 0 && TSAI //during bootm there is still need to read logo from resource partition
+	/* if booting from USB, do a "usb stop f" now, to ensure kernel can initialize USB clean
+	 * looks like kernel 3.10, 3.18 have trouble initializing USB if not clean
+	 * */
+	{
+		struct blk_desc* desc = rockchip_get_bootdev();
+		//__asm("hlt #0");
+		if (desc->if_type == IF_TYPE_USB) {
+			char cmdbuf[64];
+			printf("TSAI: stopping USB...\n");
+			snprintf(cmdbuf, 64, "usb stop f");
+			run_command(cmdbuf, 0);
+		}
+	}
+#endif
 #if defined(CONFIG_ARM64)
 	char cmdbuf[64];
 
@@ -324,9 +338,9 @@ static int do_boot_rockchip(cmd_tbl_t *cmdtp, int flag,
 	struct blk_desc *dev_desc;
 	disk_partition_t part;
 	int ret;
-#if TSAI
+
 //__asm("hlt #0");
-#endif
+
 	dev_desc = rockchip_get_bootdev();
 	if (!dev_desc) {
 		printf("dev_desc is NULL!\n");

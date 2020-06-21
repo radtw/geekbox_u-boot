@@ -88,3 +88,6 @@ CONFIG_DRM_ROCKCHIP_RGB=y
 CONFIG_DRM_ROCKCHIP_RK1000=y
 CONFIG_LCD=y
 
+#save env to usb storage
+CONFIG_ENV_IS_IN_BLK_DEV=y
+#CONFIG_DELAY_ENVIRONMENT=y //no use, will be filter out

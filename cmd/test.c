@@ -55,7 +55,6 @@ static int do_test(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	char * const *ap;
 	int i, op, left, adv, expr, last_expr, last_unop, last_binop;
-
 	/* args? */
 	if (argc < 3)
 		return 1;

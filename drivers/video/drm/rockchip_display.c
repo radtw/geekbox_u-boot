@@ -1342,7 +1342,7 @@ static int rockchip_display_probe(struct udevice *dev)
 	struct device_node *port_node, *vop_node, *ep_node;
 	struct public_phy_data *data;
 #if TSAI
-	printf("TSAI:rockchip_display_probe @%s\n", __FILE__);
+	debug("TSAI:rockchip_display_probe @%s\n", __FILE__);
 #endif
 	/* Before relocation we don't need to do anything */
 	if (!(gd->flags & GD_FLG_RELOC))
@@ -1510,7 +1510,10 @@ void rockchip_display_fixup(void *blob)
 
 	if (!get_display_size())
 		return;
-
+#if TSAI
+	printf("%s @%s\n", __FUNCTION__, __FILE__);
+//	__asm("hlt #0");
+#endif
 	if (fdt_node_offset_by_compatible(blob, 0, "rockchip,drm-logo") >= 0) {
 		list_for_each_entry(s, &rockchip_display_list, head)
 			load_bmp_logo(&s->logo, s->klogo_name);
@@ -1592,7 +1595,7 @@ int rockchip_display_bind(struct udevice *dev)
 {
 	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
 #if TSAI
-	printf("rockchip_display_bind @%s\n", __FILE__);
+	debug("rockchip_display_bind @%s\n", __FILE__);
 #endif
 	plat->size = DRM_ROCKCHIP_FB_SIZE + MEMORY_POOL_SIZE;
 

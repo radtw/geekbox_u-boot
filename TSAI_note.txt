@@ -5,6 +5,65 @@ write uboot.img by LBA
 '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 16384 /home/julian/geekbox/rkbin/trust.img 
 '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 8192 uboot.img
 
+and next boot it will appear to be in maybe mask rom?, seeing those message
+----------------------------------
+LoadTrust Addr:0x4000                                                                                                               
+Load uboot, ReadLba = 2000                                                                                                          
+hdr 000000000333cb20 + 0x0:0x42,0x4c,0x33,0x58,0x00,0x01,0x00,0x00,0x23,0x00,0x00,0x00,0xec,0x00,0x03,0x00,                         
+                                                                                                                                    
+tag:LOADER error,addr:0x4000                                                                                                        
+hdr 000000000333cb20 + 0x0:0x42,0x4c,0x33,0x58,0x00,0x01,0x00,0x00,0x23,0x00,0x00,0x00,0xec,0x00,0x03,0x00,                         
+                                                                                                                                    
+Load uboot, ReadLba = 2400                                                                                                          
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+tag:LOADER error,addr:0x4400                                                                                                        
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+Load uboot, ReadLba = 2800                                                                                                          
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+tag:LOADER error,addr:0x4800                                                                                                        
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+Load uboot, ReadLba = 2c00                                                                                                          
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+tag:LOADER error,addr:0x4c00                                                                                                        
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+Load uboot, ReadLba = 3000                                                                                                          
+hdr 000000000333cb20 + 0x0:0x42,0x4c,0x33,0x58,0x00,0x01,0x00,0x00,0x23,0x00,0x00,0x00,0xec,0x00,0x03,0x00,                         
+                                                                                                                                    
+tag:LOADER error,addr:0x5000                                                                                                        
+hdr 000000000333cb20 + 0x0:0x42,0x4c,0x33,0x58,0x00,0x01,0x00,0x00,0x23,0x00,0x00,0x00,0xec,0x00,0x03,0x00,                         
+                                                                                                                                    
+Load uboot, ReadLba = 3400                                                                                                          
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+tag:LOADER error,addr:0x5400                                                                                                        
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+Load uboot, ReadLba = 3800                                                                                                          
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+tag:LOADER error,addr:0x5800                                                                                                        
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+Load uboot, ReadLba = 3c00                                                                                                          
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+tag:LOADER error,addr:0x5c00                                                                                                        
+hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,                         
+                                                                                                                                    
+UsbBoot ...322310                                                                                                                   
+powerOn 834425
+--------------------
+
+looks like only mask rom mode, update uboot.img can be successful
+
+'/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 8192 uboot.img
+
 
 =========================================================
 get rkbin

@@ -144,7 +144,7 @@ static int rockchip_vop_probe(struct udevice *dev)
 
 static int rockchip_vop_bind(struct udevice *dev)
 {
-	printf("rockchip_vop_bind @%s\n", __FILE__);
+	debug("rockchip_vop_bind @%s\n", __FILE__);
 	//__asm("hlt #0");
 	return 0;
 }

@@ -587,8 +587,9 @@ int uclass_bind_device(struct udevice *dev)
 		if (dev->driver) {
 			drvname = dev->driver->name;
 
-			if (dev->driver->id == UCLASS_PMIC)
-				__asm("hlt #0");
+			if (dev->driver->id == UCLASS_PMIC) {
+				//__asm("hlt #0");
+			}
 		}
 		{
 			if (np && !IS_ERR(np) &&

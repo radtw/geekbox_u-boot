@@ -261,7 +261,7 @@ static int video_post_bind(struct udevice *dev)
 	ulong addr = gd->video_top;
 	ulong size;
 #if TSAI
-	printf("video_post_bind @%s\n", __FILE__);
+	debug("video_post_bind @%s\n", __FILE__);
 #endif
 
 	/* Before relocation there is nothing to do here */

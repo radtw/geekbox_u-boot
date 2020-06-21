@@ -392,7 +392,7 @@ static int rockchip_usb2phy_init(struct phy *phy)
 	struct rockchip_usb2phy *rphy = dev_get_priv(parent);
 	const struct rockchip_usb2phy_port_cfg *port_cfg;
 	void __iomem *base = get_reg_base(rphy);
-
+//__asm("hlt #0");
 	if (phy->id == USB2PHY_PORT_OTG) {
 		port_cfg = &rphy->phy_cfg->port_cfgs[USB2PHY_PORT_OTG];
 	} else if (phy->id == USB2PHY_PORT_HOST) {
@@ -483,7 +483,8 @@ static int rockchip_usb2phy_probe(struct udevice *dev)
 	struct udevice *parent = dev->parent;
 	u32 reg, index;
 #if TSAI
-	printf("rockchip_usb2phy_probe[in]\n");
+	debug("rockchip_usb2phy_probe[in] @%s\n", __FILE__);
+	//__asm("hlt #0");
 #endif
 	if (!strncmp(parent->name, "root_driver", 11) &&
 	    dev_read_bool(dev, "rockchip,grf"))
@@ -538,7 +539,7 @@ static int rockchip_usb2phy_probe(struct udevice *dev)
 		rphy->phy_cfg->phy_tuning(rphy);
 
 #if TSAI
-	printf("rockchip_usb2phy_probe[exit]\n");
+	debug("rockchip_usb2phy_probe[exit]\n");
 #endif
 	return 0;
 }

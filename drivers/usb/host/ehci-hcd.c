@@ -212,7 +212,7 @@ static int ehci_shutdown(struct ehci_ctrl *ctrl)
 	int i, ret = 0;
 	uint32_t cmd, reg;
 	int max_ports = HCS_N_PORTS(ehci_readl(&ctrl->hccr->cr_hcsparams));
-
+//__asm("hlt #0");
 	cmd = ehci_readl(&ctrl->hcor->or_usbcmd);
 	/* If not run, directly return */
 	if (!(cmd & CMD_RUN))
@@ -982,7 +982,7 @@ static int ehci_common_init(struct ehci_ctrl *ctrl, uint tweaks)
 	uint32_t reg;
 	uint32_t cmd;
 	int i;
-
+//__asm("hlt #0");
 	/* Set the high address word (aka segment) for 64-bit controller */
 	if (ehci_readl(&ctrl->hccr->cr_hccparams) & 1)
 		ehci_writel(&ctrl->hcor->or_ctrldssegment, 0);
@@ -1655,7 +1655,7 @@ err:
 int ehci_deregister(struct udevice *dev)
 {
 	struct ehci_ctrl *ctrl = dev_get_priv(dev);
-
+//__asm("hlt #0");
 	if (ctrl->init == USB_INIT_DEVICE)
 		return 0;
 
@@ -1684,9 +1684,8 @@ int ehci_setup_phy(struct udevice *dev, struct phy *phy, int index)
 	if (!phy)
 		return 0;
 
-#if 0 && TSAI
-	__asm("hlt #0");
-#endif
+	//__asm("hlt #0");
+
 	ret = generic_phy_get_by_index(dev, index, phy);
 	if (ret) {
 		if (ret != -ENOENT) {
@@ -1713,7 +1712,7 @@ int ehci_setup_phy(struct udevice *dev, struct phy *phy, int index)
 int ehci_shutdown_phy(struct udevice *dev, struct phy *phy)
 {
 	int ret = 0;
-
+//__asm("hlt #0");
 	if (!phy)
 		return 0;
 

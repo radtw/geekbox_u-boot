@@ -145,9 +145,9 @@ int lists_bind_fdt(struct udevice *parent, ofnode node, struct udevice **devp)
 		*devp = NULL;
 	name = ofnode_get_name(node);
 	pr_debug("bind node %s\n", name);
-#if 0 && TSAI
-	__asm("hlt #0");
-#endif
+
+	//__asm("hlt #0");
+
 	compat_list = ofnode_get_property(node, "compatible", &compat_length);
 	if (!compat_list) {
 		if (compat_length == -FDT_ERR_NOTFOUND) {

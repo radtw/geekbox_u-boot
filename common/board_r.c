@@ -9,7 +9,7 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
+#define DEBUG 0
 #include <common.h>
 #include <api.h>
 /* TODO: can we just include all these headers whether needed or not? */
@@ -466,7 +466,9 @@ static int initr_mmc(void)
 static int should_load_env(void)
 {
 #ifdef CONFIG_OF_CONTROL
-	return fdtdec_get_config_int(gd->fdt_blob, "load-environment", 1);
+	int ret;
+	ret = fdtdec_get_config_int(gd->fdt_blob, "load-environment", 1);
+	return ret;
 #elif defined CONFIG_DELAY_ENVIRONMENT
 	return 0;
 #else

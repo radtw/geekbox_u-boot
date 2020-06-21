@@ -112,9 +112,9 @@ static int get_bootdev_type(void)
 		devtype = "mmc";
 		printf("Use emmc as default boot media\n");
 	}
-#if 0 && TSAI
-	__asm("hlt #0");
-#endif
+
+	//__asm("hlt #0");
+
 	if (!strcmp(devtype, "mmc")) {
 		type = IF_TYPE_MMC;
 		if (devnum == 1)
@@ -240,7 +240,7 @@ RetryMMC:
 	if (!dev_desc && dev_type != IF_TYPE_MMC) {
 		env_set("devtype", "mmc");
 		printf("TSAI: dev_desc is NULL, reset to use MMC for a second chance\n");
-		__asm("hlt #0");
+		//__asm("hlt #0");
 		goto RetryMMC;
 	} else
 #endif

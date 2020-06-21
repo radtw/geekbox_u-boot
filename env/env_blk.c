@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2019 Fuzhou Rockchip Electronics Co., Ltd
  */
-
+#define DEBUG 1
 #include <common.h>
 #include <environment.h>
 #include <memalign.h>
@@ -36,7 +36,12 @@ int get_env_addr(struct blk_desc *blk_desc, int copy, u32 *env_addr)
 
 int get_env_dev(void)
 {
+#if TSAI && defined(CONFIG_TARGET_GEEKBOX)
+	//__asm("hlt #0");
+	return 0;
+#else
 	return CONFIG_SYS_MMC_ENV_DEV;
+#endif
 }
 
 #ifdef CONFIG_SYS_MMC_ENV_PART
@@ -105,7 +110,7 @@ static int env_blk_save(void)
 	const char *errmsg = NULL;
 	int ret, copy = 0;
 	u32 offset;
-
+//__asm("hlt #0");
 	blk_desc = rockchip_get_bootdev();
 	if (!blk_desc) {
 		puts("Can't find bootdev\n");
@@ -132,8 +137,8 @@ static int env_blk_save(void)
 		goto fini;
 	}
 
-	printf("Writing to %s%s(%s)... ", copy ? "redundant " : "",
-	       env_get("devtype"), env_get("devnum"));
+	printf("Writing to %s%s(%s)... crc=%x ", copy ? "redundant " : "",
+	       env_get("devtype"), env_get("devnum"), env_new->crc);
 
 	if (write_env(blk_desc, CONFIG_ENV_SIZE, offset, (u_char *)env_new)) {
 		puts("failed\n");
@@ -260,12 +265,15 @@ static int env_blk_load(void)
 		ret = -EIO;
 		goto fini;
 	}
-
+	//__asm("hlt #0");
 	if (read_env(blk_desc, CONFIG_ENV_SIZE, offset, buf)) {
 		errmsg = "!read failed";
 		ret = -EIO;
 		goto fini;
 	}
+
+	debug("TSAI: env offset %d size %d on blk, crc=%x @%s\n", offset, CONFIG_ENV_SIZE,
+			((env_t*)buf)->crc,__FILE__);
 
 	env_import(buf, 1);
 	ret = 0;

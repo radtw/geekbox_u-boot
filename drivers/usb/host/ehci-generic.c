@@ -111,7 +111,7 @@ static int ehci_usb_probe(struct udevice *dev)
 			return clock_nb;
 		}
 	}
-
+//__asm("hlt #0");
 	priv->reset_count = 0;
 	reset_nb = ofnode_count_phandle_with_args(dev_ofnode(dev), "resets",
 						  "#reset-cells");

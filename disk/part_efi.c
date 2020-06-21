@@ -433,8 +433,9 @@ static int part_test_efi(struct blk_desc *dev_desc)
 	int ret = 0;
 
 #if 0 && TSAI
-	if (dev_desc->if_type == IF_TYPE_USB)
-		__asm("hlt #0");
+	if (dev_desc->if_type == IF_TYPE_USB) {
+		//__asm("hlt #0");
+	}
 #endif
 	/* Read legacy MBR from block 0 and validate it */
 	if ((blk_dread(dev_desc, 0, 1, (ulong *)legacymbr) != 1)

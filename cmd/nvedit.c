@@ -1054,7 +1054,7 @@ static int do_env_save(cmd_tbl_t *cmdtp, int flag, int argc,
 		       char * const argv[])
 {
 	struct env_driver *env = env_driver_lookup_default();
-
+//__asm("hlt #0");
 	printf("Saving Environment to %s...\n", env->name);
 
 	return env_save() ? 1 : 0;
@@ -1233,7 +1233,7 @@ static int do_env_export(cmd_tbl_t *cmdtp, int flag,
 	int	fmt = 0;
 
 	cmd = *argv;
-
+//__asm("hlt #0");
 	while (--argc > 0 && **++argv == '-') {
 		char *arg = *argv;
 		while (*++arg) {
@@ -1353,7 +1353,7 @@ static int do_env_import(cmd_tbl_t *cmdtp, int flag,
 	size_t	size;
 
 	cmd = *argv;
-
+//__asm("hlt #0");
 	while (--argc > 0 && **++argv == '-') {
 		char *arg = *argv;
 		while (*++arg) {

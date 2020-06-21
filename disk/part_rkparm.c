@@ -290,9 +290,9 @@ static int part_get_info_rkparm(struct blk_desc *dev_desc, int idx,
 static int part_test_rkparm(struct blk_desc *dev_desc)
 {
 	int ret = 0;
-#if TSAI
+
 	//__asm("hlt #0");
-#endif
+
 	if (list_empty(&parts_head) ||
 	    (dev_num != ((dev_desc->if_type << 8) + dev_desc->devnum)))
 		ret = rkparm_init_param(dev_desc, &parts_head);

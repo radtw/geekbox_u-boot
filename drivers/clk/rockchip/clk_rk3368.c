@@ -1260,7 +1260,7 @@ static int rk3368_clk_probe(struct udevice *dev)
 
 	priv->cru = map_sysmem(plat->dtd.reg[0], plat->dtd.reg[1]);
 #endif
-	printf("rk3368_clk_probe @%s\n", __FILE__);
+	debug("rk3368_clk_probe @%s\n", __FILE__);
 
 	priv->sync_kernel = false;
 	if (!priv->armlclk_enter_hz)
@@ -1269,7 +1269,7 @@ static int rk3368_clk_probe(struct udevice *dev)
 		priv->armbclk_enter_hz = rkclk_pll_get_rate(priv->cru, APLLB);
 #if IS_ENABLED(CONFIG_SPL_BUILD) || IS_ENABLED(CONFIG_TPL_BUILD) || (1 && defined(CONFIG_TARGET_GEEKBOX))
 	rkclk_init(priv->cru);
-	printf("TSAI: calling rkclk_init() to enable VOP/HMDI registers\n");
+	printf("TSAI: calling rkclk_init() to enable VOP/HMDI registers @%s\n", __FILE__);
 #else
 	(void)rkclk_init;
 #endif

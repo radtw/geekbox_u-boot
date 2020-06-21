@@ -47,6 +47,12 @@
 / {
 	model = "GeekBox";
 	compatible = "geekbuying,geekbox", "rockchip,rk3368";
+#if TSAI
+	//TSAI:2020-06-21, specify 0 so that I can load when USB stick is ready
+	config {
+		load-environment = <0>;
+	};
+#endif
 
 	chosen {
 		stdout-path = "serial2:115200n8";

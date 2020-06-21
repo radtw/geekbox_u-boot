@@ -382,7 +382,7 @@ static int rockchip_i2c_probe(struct udevice *bus)
 {
 	struct rk_i2c *priv = dev_get_priv(bus);
 #if TSAI
-	printf("rockchip_i2c_probe\n");
+	debug("rockchip_i2c_probe @%s\n", __FILE__);
 #endif
 	priv->regs = dev_read_addr_ptr(bus);
 

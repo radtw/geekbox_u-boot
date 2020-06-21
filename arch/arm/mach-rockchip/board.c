@@ -167,6 +167,9 @@ int fb_set_reboot_flag(void)
 
 #if TSAI && defined(CONFIG_TARGET_GEEKBOX)
 extern int rkparm_partition_parse(char *param, struct blk_desc *dev_desc);
+extern int load_overriding_uboot(struct blk_desc *dev_desc, disk_partition_t *info);
+
+extern int env_load(void);
 #endif
 
 static int boot_from_udisk(void)
@@ -197,6 +200,9 @@ static int boot_from_udisk(void)
 			}
 			snprintf(usbcmd, sizeof(usbcmd), "rkimgtest usb %d", i);
 			if (!run_command(usbcmd, -1)) {
+				rockchip_set_bootdev(desc);
+				env_load();
+
 				/* if calling rockchip_set_bootdev(desc); it will not update kernel bootargs, so clear it to force it refresh*/
 				rockchip_set_bootdev(NULL);
 				env_set("devtype", "usb");
@@ -205,14 +211,17 @@ static int boot_from_udisk(void)
 				printf("Boot from usb %d devtype=usb devnum=%d @%s\n", i, i,__FILE__);
 				if (rockchip_get_bootdev() != desc) {
 					printf("ERROR: refreshing booting device doesn't succeed @%s\n", __FILE__);
-					//__asm("hlt #0");
 				}
-
 				{
-					//TSAI find a partition named "RKPARM" and parse to be backward compatible
 					disk_partition_t info;
 					int partno;
 					//__asm("hlt #0");
+					partno = part_get_info_by_name(desc, "uboot", &info );
+					if (partno > 0) {
+						load_overriding_uboot(desc, &info);
+					}
+
+					//TSAI find a partition named "RKPARM" and parse to be backward compatible
 					partno = part_get_info_by_name(desc, "RKPARM", &info );
 					if (partno > 0) {
 						long ret;

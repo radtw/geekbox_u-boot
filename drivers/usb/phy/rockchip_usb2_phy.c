@@ -65,7 +65,7 @@ static void property_enable(struct dwc2_plat_otg_data *pdata,
 	tmp = en ? reg->enable : reg->disable;
 	mask = GENMASK(reg->bitend, reg->bitstart);
 	val = (tmp << reg->bitstart) | (mask << BIT_WRITEABLE_SHIFT);
-
+//__asm("hlt #0");
 	writel(val, pdata->regs_phy + reg->offset);
 }
 
@@ -201,7 +201,7 @@ void otg_phy_off(struct dwc2_udc *dev)
 {
 	struct dwc2_plat_otg_data *pdata = dev->pdata;
 	struct rockchip_usb2_phy_cfg *phy_cfg = pdata->priv;
-
+//__asm("hlt #0");
 	if (!pdata->regs_phy && otg_phy_parse(dev)) {
 		pr_err("otg-phy parse error\n");
 		return;

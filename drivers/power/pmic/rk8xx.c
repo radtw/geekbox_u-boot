@@ -290,7 +290,7 @@ static int rk8xx_bind(struct udevice *dev)
 	ofnode regulators_node;
 	int children;
 #if TSAI
-	printf("rk8xx_bind\n");
+	debug("rk8xx_bind\n");
 	//__asm("hlt #0");
 #endif
 	regulators_node = dev_read_subnode(dev, "regulators");
@@ -425,7 +425,7 @@ static int rk8xx_probe(struct udevice *dev)
 	uint8_t power_en0, power_en1, power_en2, power_en3;
 	uint8_t value;
 #if TSAI
-	printf("rk8xx_probe \n");
+	debug("rk8xx_probe \n");
 	//__asm("hlt #0");
 #endif
 	/* read Chip variant */
