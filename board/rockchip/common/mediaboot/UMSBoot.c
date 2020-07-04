@@ -87,6 +87,9 @@ static struct rkusb_hcd_cfg rkusb_hcd[] = {
 		.enable = true,
 		.regbase = (void *)RKIO_USBHOST_PHYS,
 		.gpio_vbus = GPIO_BANK0 | GPIO_A4,
+#if TSAI
+		.hw_init = inno_usb_phy_reset,
+#endif
 	},
 #elif defined(RKUSB_UMS_BOOT_FROM_DWC2_OTG)
 	{
@@ -156,6 +159,28 @@ static struct rkusb_hcd_cfg rkusb_hcd[] = {
 __maybe_unused
 static void inno_usb_phy_reset(void)
 {
+#if TSAI && defined(CONFIG_RKCHIP_RK3368)
+#if defined(RKUSB_UMS_BOOT_FROM_EHCI_HOST1)
+	//When it's transferring execution from uboot-2019, it may turn usb-phys off
+	//in that case, turn it back on so we have usb-host again.
+	{
+		uint32_t reg;
+		//grf_writel(0x00030001, GRF_USBPHY_CON1);
+		//mdelay(10);
+		//grf_writel(0x00030002, GRF_USBPHY_CON1);
+		//__asm("hlt #0");
+		reg = grf_readl(GRF_UOC1_CON5);
+		if (reg) {
+			printf("TSAI: Usb-phy1@728 is suspended, remove susupend @%s\n", __FILE__);
+			// (0x1ff << 16) is mask, must need to be provided to write to this register
+			grf_writel(0x01ff0000, GRF_UOC1_CON5);
+		}
+		//reset otg phys as well
+		grf_writel(0x10001000, 0x700); //TSAI: this is a trial, based on rk3288's reset bit
+		grf_writel(0x01ff0000, 0x700);
+	}
+#endif
+#endif
 #if defined(CONFIG_RKCHIP_RK3126) || defined(CONFIG_RKCHIP_RK3128)
 	/* Phy PLL recovering */
 	grf_writel(0x00030001, GRF_UOC0_CON0);

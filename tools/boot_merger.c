@@ -935,6 +935,8 @@ int main(int argc, char** argv) {
 			optPath = argv[i];
 		}
 	}
+//TSAI: print outPath
+//printf("gOpts.outPath=%s\n", gOpts.outPath);
 	if (!merge && !optPath) {
 		fprintf(stderr, "need set out path to unpack!\n");
 		printHelp();

@@ -571,6 +571,9 @@ else
 KBUILD_CFLAGS	+= -O2
 endif
 
+#TSAI: optimize for debug
+KBUILD_CFLAGS	+= -Og
+
 ifdef BUILD_TAG
 KBUILD_CFLAGS += -DBUILD_TAG='"$(BUILD_TAG)"'
 endif
@@ -935,6 +938,10 @@ else
 RK_TOS_BIN ?= `sed -n "/TOS=/s/TOS=//p" ./tools/rk_tools/RKTRUST/$(RKCHIP)TOS.ini|tr -d '\r'`
 endif
 endif
+
+$(info TSAI CONFIG_MERGER_MINILOADER=$(CONFIG_MERGER_MINILOADER))
+$(info TSAI CONFIG_MERGER_TRUSTIMAGE=$(CONFIG_MERGER_TRUSTIMAGE))
+
 
 RKLoader_uboot.bin: u-boot.bin
 ifdef CONFIG_SECOND_LEVEL_BOOTLOADER

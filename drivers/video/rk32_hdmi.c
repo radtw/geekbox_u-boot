@@ -1580,7 +1580,7 @@ static int hdmi_dev_config_video(struct hdmi_dev *hdmi_dev,
 				 struct hdmi_video *vpara)
 {
 	int vic;
-
+//__asm("hlt #0");
 	printf("%s vic %d color_output %d color_output_depth %d\n",
 	       __func__, vpara->vic, vpara->color_output,
 	       vpara->color_output_depth);
@@ -1790,6 +1790,7 @@ static int rk32_hdmi_hardware_init(struct hdmi_dev *hdmi_dev)
 void rk32_hdmi_probe(vidinfo_t *panel)
 {
 	struct hdmi_dev *hdmi_dev = NULL;
+//__asm("hlt #0");
 
 	hdmi_dev = malloc(sizeof(struct hdmi_dev));
 	if (hdmi_dev != NULL && panel != NULL) {

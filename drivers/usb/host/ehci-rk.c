@@ -20,6 +20,7 @@ int ehci_hcd_init(int index, enum usb_init_type init,
 		return -ENODEV;
 printf("TSAI: ehci_hcd_init idx %d type %d rkusb_active_hcd %p reg %p %s\n", index, init,
 		rkusb_active_hcd, rkusb_active_hcd->regbase, __FILE__);
+//__asm("hlt #0");
 	*hccr = (struct ehci_hccr *)(rkusb_active_hcd->regbase);
 	*hcor = (struct ehci_hcor *)(rkusb_active_hcd->regbase + 0x10);
 

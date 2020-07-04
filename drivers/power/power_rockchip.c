@@ -193,7 +193,7 @@ int pmic_init(unsigned char  bus)
 	int ret = -1;
 	int i;
 	char *pmic_name;
-
+//__asm("hlt #0");
 	for (i = 0; i < MAX_DCDC_NUM; i++)
 		regulator_init_pmic_matches[i].name = "NULL";
 

@@ -168,7 +168,7 @@ extern char bootloader_ver[24];
 int board_late_init(void)
 {
 	debug("board_late_init %s\n", __FILE__);
-
+//__asm("hlt #0");
 	board_init_adjust_env();
 
 	load_disk_partitions();

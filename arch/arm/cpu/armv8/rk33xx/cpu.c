@@ -132,6 +132,7 @@ static inline void cpu_axi_qos_prority_level_config(void)
 #ifdef CONFIG_ARCH_CPU_INIT
 int arch_cpu_init(void)
 {
+//__asm("hlt #0");
 	rkclk_set_pll();
 	gd->arch.chiptype = rk_get_chiptype();
 

@@ -961,7 +961,7 @@ int usb_lowlevel_init(int index, enum usb_init_type init, void **controller)
 	int i;
 	int rc;
 printf("TSAI: usb_lowlevel_init idx %d type %d @%s\n", index, init, __FILE__);
-
+//__asm("hlt #0");
 	rc = ehci_hcd_init(index, init, &ehcic[index].hccr, &ehcic[index].hcor);
 	if (rc)
 		return rc;

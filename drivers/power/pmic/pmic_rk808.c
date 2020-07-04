@@ -372,7 +372,20 @@ static int rk808_parse_dt(const void* blob)
 		if (reg_match[i].boot_on ||
 		    (reg_match[i].min_uV ==
 		    reg_match[i].max_uV))
+		{
 			ret = rk808_set_regulator_init(&reg_match[i], i);
+#if 0 && TSAI /* one time check to see who update hdmi connection?*/
+			{
+				volatile uint32_t value;
+				value = *(volatile uint32_t*)(0xFF98c010);
+				printf("TSAI:regul[%d]=%s hdmireg=%x \n",
+					i, reg_match[i].name, value); ;
+				if (i==10) {
+					__asm("hlt #0");
+				}
+			}
+#endif
+		}
 	}
 
 	fdtdec_decode_gpios(blob, node, "gpios", gpios, 2);
@@ -392,6 +405,7 @@ static int rk808_parse_dt(const void* blob)
 int pmic_rk808_init(unsigned char bus)
 {
 	int ret;
+//__asm("hlt #0");
 	if (!rk808.pmic) {
 		if (!gd->fdt_blob)
 			return -1;

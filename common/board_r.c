@@ -909,7 +909,7 @@ void board_init_r(gd_t *new_gd, ulong dest_addr)
 #ifdef CONFIG_NEEDS_MANUAL_RELOC
 	int i;
 #endif
-
+//__asm("hlt #0");
 #if !defined(CONFIG_X86) && !defined(CONFIG_ARM) && !defined(CONFIG_ARM64)
 	gd = new_gd;
 #endif
