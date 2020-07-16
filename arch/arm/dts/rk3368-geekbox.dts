@@ -361,4 +361,10 @@
 &route_hdmi {
 	status = "okay";
 };
+
+//2020-07-16: it appears legacy uboot would initialize mailbox, 
+//but turns out there is no driver in this version uboot
+&mbox {
+    status = "okay";
+};
 #endif

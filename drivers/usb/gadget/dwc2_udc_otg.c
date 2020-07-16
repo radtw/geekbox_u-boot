@@ -241,7 +241,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 	struct dwc2_udc *dev = the_controller;
 	int retval = 0;
 	unsigned long flags = 0;
-
+//__asm("hlt #0");
 	debug_cond(DEBUG_SETUP != 0, "%s: %s\n", __func__, "no name");
 
 	if (!driver
@@ -289,7 +289,7 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 {
 	struct dwc2_udc *dev = the_controller;
 	unsigned long flags = 0;
-
+//__asm("hlt #0");
 	if (!dev)
 		return -ENODEV;
 	if (!driver || driver != dev->driver)
@@ -888,7 +888,7 @@ int dwc2_udc_probe(struct dwc2_plat_otg_data *pdata)
 {
 	struct dwc2_udc *dev = &memory;
 	int retval = 0;
-
+//__asm("hlt #0");
 	debug("%s: %p\n", __func__, pdata);
 
 	dev->pdata = pdata;

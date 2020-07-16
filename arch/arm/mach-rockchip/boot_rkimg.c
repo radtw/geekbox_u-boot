@@ -217,8 +217,12 @@ struct blk_desc *rockchip_get_bootdev(void)
 {
 	int dev_type;
 	int devnum;
-#if TSAI /* no longer valid, eg. when USB deinit */
+#if TSAI
+	/* when a device is no longer valid, eg. when USB deinit, by "usb stop"
+	 * its if_type is likely to be filled with some rubbish so do a sanity check
+	 * */
 	if (dev_desc->if_type >= IF_TYPE_COUNT) {
+		printf("TSAI: previous set bootdev is no longer valid. reset to emmc @%s\n", __FILE__);
 		dev_desc = NULL;
 	}
 #endif
@@ -239,6 +243,7 @@ RetryMMC:
 #if TSAI
 	if (!dev_desc && dev_type != IF_TYPE_MMC) {
 		env_set("devtype", "mmc");
+		env_set("devnum", "0");
 		printf("TSAI: dev_desc is NULL, reset to use MMC for a second chance\n");
 		//__asm("hlt #0");
 		goto RetryMMC;

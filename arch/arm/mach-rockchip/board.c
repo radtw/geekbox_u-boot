@@ -191,58 +191,83 @@ static int boot_from_udisk(void)
 #if TSAI
 		/* go through each USB devices not just first one*/
 		int i;
+		struct blk_desc *desc_best = NULL; //best choice so far
+		int dev_num_best = 0;
+
 		char usbcmd[32];
 		for (i=0; ; i++) {
 			desc = blk_get_devnum_by_type(IF_TYPE_USB, i);
 			if (!desc) {
+				if (desc_best) {
+					break;
+				}
 				printf("No usb[%d] device found\n", i);
 				return -ENODEV;
 			}
 			snprintf(usbcmd, sizeof(usbcmd), "rkimgtest usb %d", i);
 			if (!run_command(usbcmd, -1)) {
-				rockchip_set_bootdev(desc);
-				env_load();
-
-				/* if calling rockchip_set_bootdev(desc); it will not update kernel bootargs, so clear it to force it refresh*/
-				rockchip_set_bootdev(NULL);
-				env_set("devtype", "usb");
-				sprintf(usbcmd, "%d", i);
-				env_set("devnum", usbcmd);
-				printf("Boot from usb %d devtype=usb devnum=%d @%s\n", i, i,__FILE__);
-				if (rockchip_get_bootdev() != desc) {
-					printf("ERROR: refreshing booting device doesn't succeed @%s\n", __FILE__);
-				}
-				{
-					disk_partition_t info;
-					int partno;
-					//__asm("hlt #0");
-					partno = part_get_info_by_name(desc, "uboot", &info );
-					if (partno > 0) {
-						load_overriding_uboot(desc, &info);
+				if (desc_best) {
+					if (desc_best->removable==0) {
+						//JMicron USB-SATA adaptor on Geekbox landingship should have lower priority.
+						//prefer removable device
+						desc_best = desc;
+						dev_num_best = i;
 					}
-
-					//TSAI find a partition named "RKPARM" and parse to be backward compatible
-					partno = part_get_info_by_name(desc, "RKPARM", &info );
-					if (partno > 0) {
-						long ret;
-						char* buf;
-						int byteSize;
-						byteSize = (info.size > 16?16:info.size) * info.blksz;
-						buf = malloc(byteSize);
-						printf("TSAI: RKPARM parition[%d] found, parse its parameter @%s\n", partno, __FILE__);
-
-						ret = blk_dread(desc, info.start, 16, buf);
-						if (ret > 0)
-							rkparm_partition_parse(buf, desc);
-						free(buf);
-					}
+					break;
 				}
-
-				break;
+				else {
+					desc_best = desc;
+					dev_num_best = i;
+				}
 			}
 			else {
 				//__asm("hlt #0");
 			}
+		}
+		if (desc_best) {
+			rockchip_set_bootdev(desc_best);
+			env_load();
+
+			/* if calling rockchip_set_bootdev(desc); it will not update kernel bootargs, so clear it to force it refresh*/
+			rockchip_set_bootdev(NULL);
+			env_set("devtype", "usb");
+			sprintf(usbcmd, "%d", dev_num_best);
+			env_set("devnum", usbcmd);
+			printf("Boot from usb %d devtype=usb devnum=%d %s @%s\n", dev_num_best, dev_num_best,
+					desc_best->vendor, __FILE__);
+			//__asm("hlt #0");
+			if (rockchip_get_bootdev() != desc_best) {
+				printf("ERROR: refreshing booting device doesn't succeed @%s\n", __FILE__);
+			}
+			{
+				disk_partition_t info;
+				int partno;
+				//__asm("hlt #0");
+				partno = part_get_info_by_name(desc_best, "uboot", &info );
+				if (partno > 0) {
+					load_overriding_uboot(desc_best, &info);
+				}
+
+				//TSAI find a partition named "RKPARM" and parse to be backward compatible
+				partno = part_get_info_by_name(desc_best, "RKPARM", &info );
+				if (partno > 0) {
+					long ret;
+					char* buf;
+					int byteSize;
+					byteSize = (info.size > 16?16:info.size) * info.blksz;
+					buf = malloc(byteSize);
+					printf("TSAI: RKPARM parition[%d] found, parse its parameter @%s\n", partno, __FILE__);
+
+					ret = blk_dread(desc_best, info.start, 16, buf);
+					if (ret > 0) {
+						rkparm_partition_parse(buf, desc_best);
+					}
+					free(buf);
+				}
+			}
+		}
+		else {
+			return -ENODEV;
 		}
 #else
 		desc = blk_get_devnum_by_type(IF_TYPE_USB, 0);
@@ -631,7 +656,7 @@ int board_usb_init(int index, enum usb_init_type init)
 	const fdt32_t *reg;
 	fdt_addr_t addr;
 	int node;
-
+//__asm("hlt #0");
 	/* find the usb_otg node */
 	node = fdt_node_offset_by_compatible(blob, -1, "snps,dwc2");
 

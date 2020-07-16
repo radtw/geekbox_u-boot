@@ -162,7 +162,7 @@ void otg_phy_init(struct dwc2_udc *dev)
 	struct rockchip_usb2_phy_cfg *phy_cfg = NULL;
 	struct rockchip_usb2_phy_dt_id *of_id;
 	int i;
-
+//__asm("hlt #0");
 	if (!pdata->regs_phy && otg_phy_parse(dev)) {
 		pr_err("otg-phy parse error\n");
 		return;

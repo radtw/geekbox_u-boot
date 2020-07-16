@@ -1,9 +1,35 @@
 
+========================================================
+enter maskrom from uboot
+
+"rkrom" to enter maskrom mode
+Enter rockusb failed, fallback to bootrom...                                                                                        
+INFO:    PSCI Affinity Map:                                                                                                         
+INFO:      AffInst: Level 1, MPID 0x0, State ON                                                                                     
+INFO:      AffInst: Level 1, MPID 0x100, State OFF                                                                                  
+INFO:      AffInst: Level 0, MPID 0x0, State ON                                                                                     
+INFO:      AffInst: Level 0, MPID 0x1, State OFF                                                                                    
+INFO:      AffInst: Level 0, MPID 0x2, State OFF                                                                                    
+INFO:      AffInst: Level 0, MPID 0x3, State OFF                                                                                    
+INFO:      AffInst: Level 0, MPID 0x100, State OFF                                                                                  
+INFO:      AffInst: Level 0, MPID 0x101, State OFF                                                                                  
+INFO:      AffInst: Level 0, MPID 0x102, State OFF                                                                                  
+INFO:      AffInst: Level 0, MPID 0x103, State OFF                                                                                  
+
+but it doesn't work to run
+'/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 8192 uboot.img
+Write LBA failed!
+
+try old tool?
+sudo ../../utils/upgrade_tool di uboot ./uboot.img
+
+
 =========================================================
 
 write uboot.img by LBA
+
+first, write trust.img to emmc
 '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 16384 /home/julian/geekbox/rkbin/trust.img 
-'/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 8192 uboot.img
 
 and next boot it will appear to be in maybe mask rom?, seeing those message
 ----------------------------------
@@ -59,11 +85,13 @@ hdr 000000000333cb20 + 0x0:0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0
 UsbBoot ...322310                                                                                                                   
 powerOn 834425
 --------------------
+'/home/julian/geekbox/rkdeveloptool/rkdeveloptool' ld
+DevNo=1	Vid=0x2207,Pid=0x330a,LocationID=102	Loader
 
-looks like only mask rom mode, update uboot.img can be successful
+this is not mask rom mode, but only in this state, updating uboot.img will be successful.
+so now write uboot to emmc
 
 '/home/julian/geekbox/rkdeveloptool/rkdeveloptool' WL 8192 uboot.img
-
 
 =========================================================
 get rkbin

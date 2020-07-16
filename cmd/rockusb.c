@@ -72,7 +72,6 @@ static int rkusb_init(const char *devtype, const char *devnums_part_str)
 	int partnum, cnt;
 	int ret = -1;
 	struct ums *ums_new;
-
 	s = strdup(devnums_part_str);
 	if (!s)
 		return -1;

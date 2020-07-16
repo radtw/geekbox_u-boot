@@ -10,6 +10,8 @@
 /*TSAI*/
 #define CONFIG_BOOTCOMMAND "bootrkp"
 
+/* TSAI: I think 3368 usb otg is similar to 3288??, but experiment doesn't go well */
+/*#define CONFIG_ROCKCHIP_USB2_PHY*/
 
 #include <configs/rk3368_common.h>
 

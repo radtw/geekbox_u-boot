@@ -8,12 +8,20 @@
 #include <dm/device.h>
 #include <dm/uclass.h>
 
+#include <asm/io.h>
+#include "usb.h"
+
 DECLARE_GLOBAL_DATA_PTR;
 
 #if TSAI && defined(CONFIG_TARGET_GEEKBOX)
+/* TSAI: for additional configs, put in include/configs/geekbox.h */
+
 extern int tsai_geekbox_probe_display(void);
 extern int ctrlc(void);
+
 #endif
+
+extern int board_usb_init(int index, enum usb_init_type init);
 
 
 static void probe_pmic(void) {
@@ -59,6 +67,17 @@ int rkparm_partition_parse(char *param, struct blk_desc *dev_desc)
 	return 0;
 }
 
+void reset_some_hardware(void) {
+	//disable USB so that overriding uboot can start it fresh
+	char cmdbuf[64];
+	printf("TSAI: stopping USB...\n");
+	snprintf(cmdbuf, 64, "usb stop f");
+	run_command(cmdbuf, 0);
+	//__asm("hlt #0");
+	//suspend otg-phys
+	writel(0x01ff01d1, 0xff770700);
+}
+
 //TSAI: if usb-stick contains uboot partition, transfer execution to that uboot, can be stopped by ctrl-c
 //this is for legacy device
 //called from boot_from_udisk()
@@ -79,14 +98,7 @@ int load_overriding_uboot(struct blk_desc *dev_desc, disk_partition_t *info)
 			r = blk_dread(dev_desc, (info->start + 4), szlba, (void*)0x200000);
 			if (r==szlba) {
 				void (*pfn)(void);
-				//disable USB so that overriding uboot can start it fresh
-				{
-//					__asm("hlt #0");
-					char cmdbuf[64];
-					printf("TSAI: stopping USB...\n");
-					snprintf(cmdbuf, 64, "usb stop f");
-					run_command(cmdbuf, 0);
-				}
+				reset_some_hardware();
 				printf("TSAI: jumping to uboot partition on %s:%s @%s\n",
 						dev_desc->vendor, dev_desc->product, __FILE__);
 				puts("==============================================\n");
@@ -128,7 +140,6 @@ int rk_board_init(void)
 #if TSAI && defined(CONFIG_DRM_ROCKCHIP)
 	tsai_geekbox_probe_display();
 #endif
-
 	return 0;
 }
 

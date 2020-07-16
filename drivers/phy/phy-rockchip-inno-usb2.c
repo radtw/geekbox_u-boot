@@ -365,7 +365,7 @@ void otg_phy_init(struct dwc2_udc *dev)
 	struct udevice *udev;
 	void __iomem *base;
 	int ret;
-
+//__asm("hlt #0");
 	ret = uclass_get_device_by_name(UCLASS_PHY, "usb2-phy", &udev);
 	if (ret == -ENODEV) {
 		pr_err("%s: get u2phy node failed: %d\n", __func__, ret);
@@ -392,9 +392,9 @@ static int rockchip_usb2phy_init(struct phy *phy)
 	struct rockchip_usb2phy *rphy = dev_get_priv(parent);
 	const struct rockchip_usb2phy_port_cfg *port_cfg;
 	void __iomem *base = get_reg_base(rphy);
-//__asm("hlt #0");
 	if (phy->id == USB2PHY_PORT_OTG) {
 		port_cfg = &rphy->phy_cfg->port_cfgs[USB2PHY_PORT_OTG];
+		//__asm("hlt #0");
 	} else if (phy->id == USB2PHY_PORT_HOST) {
 		port_cfg = &rphy->phy_cfg->port_cfgs[USB2PHY_PORT_HOST];
 	} else {
@@ -484,7 +484,7 @@ static int rockchip_usb2phy_probe(struct udevice *dev)
 	u32 reg, index;
 #if TSAI
 	debug("rockchip_usb2phy_probe[in] @%s\n", __FILE__);
-	//__asm("hlt #0");
+//	__asm("hlt #0");
 #endif
 	if (!strncmp(parent->name, "root_driver", 11) &&
 	    dev_read_bool(dev, "rockchip,grf"))

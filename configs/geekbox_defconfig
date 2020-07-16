@@ -34,6 +34,9 @@ CONFIG_LIB_RAND=y
 #Need Rockusb
 CONFIG_USB_GADGET=y
 CONFIG_USB_GADGET_DWC2_OTG=y
+#2020-07-04: want to see if phy can be enable/disable to transfer to legacy uboot
+#but CONFIG_USB_GADGET_DWC2_OTG_PHY is Samsung enxynos specific
+CONFIG_USB_GADGET_DWC2_OTG_PHY=n
 CONFIG_CMD_ROCKUSB=y
 CONFIG_USB_GADGET_DOWNLOAD=y
 #CONFIG_SPL=y
@@ -66,9 +69,18 @@ CONFIG_OF_LIVE=y
 CONFIG_USING_KERNEL_DTB=n
 #I2C_EDID itself doesn't conflict with USB-PHY, 
 CONFIG_I2C_EDID=y
-#CONFIG_PHY requires related section in dts 
+#CONFIG_PHY requires related section in dts
+#without PHY, there will be such error 
+# Bus usb@ff500000: generic_phy_get_by_index(dev=000000007bdfbeb0, index=0, phy=000000007be03a10)                                     
+# generic_phy_get_by_index: uclass_get_device_by_ofnode failed: err=-19                                                               
+# failed to get usb phy @drivers/usb/host/ehci-hcd.c                                                                                  
+# Port not available.                                                                                                                 
+# No usb[0] device found                                                                                                              
+ 
 CONFIG_PHY=y
+#TSAI: 20200704: there are another possible usb phy: ROCKCHIP_USB2_PHY, so try that
 CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+
 
 CONFIG_DRM_ROCKCHIP=y
 
@@ -91,3 +103,6 @@ CONFIG_LCD=y
 #save env to usb storage
 CONFIG_ENV_IS_IN_BLK_DEV=y
 #CONFIG_DELAY_ENVIRONMENT=y //no use, will be filter out
+
+#2020-07-16: this will init mcu, without it mailbox would not work!
+CONFIG_ARCH_EARLY_INIT_R=y

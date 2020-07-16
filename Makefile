@@ -602,7 +602,7 @@ endif
 
 #TSAI: label my own modifications ##################################
 KBUILD_CFLAGS += -DTSAI=1 
-KBUILD_CFLAGS += -Og -Wno-maybe-uninitialized
+KBUILD_CFLAGS += -Og -Wno-maybe-uninitialized -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
 #KBUILD_CFLAGS += -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline -fno-unit-at-a-time -fno-toplevel-reorder -fno-predictive-commoning
 #TSAI: work-around error: 'for' loop initial declarations are only allowed in C99 or C11 mode
 #-std=c99, -std=gnu99, -std=c11 or -std=gnu11

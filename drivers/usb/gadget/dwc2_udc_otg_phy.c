@@ -42,7 +42,6 @@ void otg_phy_init(struct dwc2_udc *dev)
 	unsigned int usb_phy_ctrl = dev->pdata->usb_phy_ctrl;
 	struct dwc2_usbotg_phy *phy =
 		(struct dwc2_usbotg_phy *)dev->pdata->regs_phy;
-
 	dev->pdata->phy_control(1);
 
 	/* USB PHY0 Enable */
@@ -80,7 +79,6 @@ void otg_phy_off(struct dwc2_udc *dev)
 	unsigned int usb_phy_ctrl = dev->pdata->usb_phy_ctrl;
 	struct dwc2_usbotg_phy *phy =
 		(struct dwc2_usbotg_phy *)dev->pdata->regs_phy;
-
 	/* reset controller just in case */
 	writel(PHY_SW_RST0, &phy->rstcon);
 	udelay(20);
