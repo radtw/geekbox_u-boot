@@ -354,6 +354,7 @@ int board_late_init(void)
 {
 #if TSAI
 	printf("TSAI board_late_init @%s\n", __FILE__);
+	//__asm("hlt #0");
 #endif
 	rockchip_set_ethaddr();
 	rockchip_set_serialno();

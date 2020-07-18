@@ -528,7 +528,7 @@ static int dwmci_execute_tuning(struct mmc *mmc, u32 opcode)
 {
 #endif
 	struct dwmci_host *host = (struct dwmci_host *)mmc->priv;
-
+//__asm("hlt #0");
 	if (!host->execute_tuning)
 		return -EIO;
 
@@ -652,13 +652,18 @@ static int dwmci_get_cd(struct udevice *dev)
 #endif
 	return ret;
 }
+#if 0 && TSAI
+#include "dm/device.h"
+#endif
 
 #ifdef CONFIG_DM_MMC
 int dwmci_probe(struct udevice *dev)
 {
 	struct mmc *mmc = mmc_get_mmc_dev(dev);
-#if TSAI
-	debug("TSAI dwmci_probe @%s\n", __FILE__);
+#if 0 && TSAI
+	const char* name = mmc->dev->name;
+	debug("TSAI dwmci_probe name=%s @%s\n", name, __FILE__);
+	//__asm("hlt #0"); /* tuning is not executed automatically */
 #endif
 	return dwmci_init(mmc);
 }

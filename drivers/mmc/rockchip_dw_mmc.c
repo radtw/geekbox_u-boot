@@ -129,7 +129,7 @@ static int rockchip_dwmmc_execute_tuning(struct dwmci_host *host, u32 opcode)
 	struct mmc *mmc = host->mmc;
 	struct udevice *dev = host->priv;
 	struct rockchip_dwmmc_priv *priv = dev_get_priv(dev);
-
+//	__asm("hlt #0");
 	if (IS_ERR(&priv->sample_clk))
 		return -EIO;
 
@@ -176,11 +176,6 @@ static int rockchip_dwmmc_probe(struct udevice *dev)
 	struct dwmci_host *host = &priv->host;
 	struct udevice *pwr_dev __maybe_unused;
 	int ret;
-#if TSAI
-	printf("TSAI rockchip_dwmmc_probe @%s\n", __FILE__);
-//	__asm("hlt #0");
-#endif
-
 #ifdef CONFIG_SPL_BUILD
 	mmc_gpio_init_direct();
 #endif
@@ -244,6 +239,22 @@ static int rockchip_dwmmc_probe(struct udevice *dev)
 	host->mmc->priv = &priv->host;
 	host->mmc->dev = dev;
 	upriv->mmc = host->mmc;
+
+#if TSAI && defined(CONFIG_TARGET_GEEKBOX)
+	{
+		struct blk_desc *blk = mmc_get_blk_desc( host->mmc );
+		if (host->ioaddr==(void*)0xFF0F0000) {
+			blk->devnum = 0; //emmc
+		}
+		else if (host->ioaddr==(void*)0xFF0C0000) {
+			blk->devnum = 1; //microsd
+		}
+		else if (host->ioaddr==(void*)0xFF0D0000) {
+			blk->devnum = 2; //sdio/wifi
+		}
+		printf("TSAI rockchip_dwmmc_probe name=%s devnum=%d @%s\n", dev->name, blk->devnum, __FILE__);
+	}
+#endif
 
 	return dwmci_probe(dev);
 }

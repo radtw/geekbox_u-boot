@@ -367,4 +367,9 @@
 &mbox {
     status = "okay";
 };
+
+//20200718: let uboot initialize sdio see if kernel can use it directly?
+&sdio0 {
+    status = "okay";
+};
 #endif

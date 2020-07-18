@@ -134,6 +134,7 @@ int get_mmc_num(void)
 
 int mmc_get_next_devnum(void)
 {
+	//__asm("hlt #0");
 	return blk_find_max_devnum(IF_TYPE_MMC);
 }
 
@@ -199,7 +200,7 @@ void print_mmc_devices(char separator)
 			printf(" (%s)", mmc_type);
 	}
 
-	printf("\n");
+	printf(" @%s\n", __FILE__);
 }
 
 #else

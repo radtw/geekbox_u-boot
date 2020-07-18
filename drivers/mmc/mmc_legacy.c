@@ -35,6 +35,7 @@ struct mmc *find_mmc_device(int dev_num)
 
 int mmc_get_next_devnum(void)
 {
+	//__asm("hlt #0");
 	return cur_dev_num++;
 }
 
